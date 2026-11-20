@@ -2,12 +2,33 @@ import { reactive, watch } from 'vue'
 import { todayStr, getDayInfo, getBazi } from './lib/calendar.js'
 import { getFortune } from './lib/fortune.js'
 import { loadSettings, saveSettings } from './lib/ai.js'
+import { buildResult } from './lib/hexagram.js'
 
 const PROFILE_KEY = 'tianji.profile'
 
 function loadProfile() {
   try {
     return JSON.parse(localStorage.getItem(PROFILE_KEY))
+  } catch {
+    return null
+  }
+}
+
+function loadHexSession() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('tianji.gua.latest'))
+    if (!saved || (saved.date && saved.date !== todayStr()) || !Array.isArray(saved.lines) || saved.lines.length !== 6) return null
+    return { result: buildResult(saved.lines), question: saved.question || '' }
+  } catch {
+    return null
+  }
+}
+
+function loadDreamSession() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('tianji.dream.selection'))
+    if (!saved?.keyword || (saved.date && saved.date !== todayStr())) return null
+    return saved
   } catch {
     return null
   }
@@ -20,8 +41,8 @@ export const store = reactive({
   location: { latitude: 39.9042, longitude: 116.4074, source: 'default' },
   aiOpen: false,
   aiContextKind: 'daily',
-  hexSession: null,
-  dreamSession: null,
+  hexSession: loadHexSession(),
+  dreamSession: loadDreamSession(),
   tabRequest: null
 })
 

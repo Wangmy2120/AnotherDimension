@@ -135,7 +135,7 @@ function submit() {
 <style scoped>
 .home-profile { max-width: 1600px; min-height: 100vh; margin: 0 auto; padding: 140px 64px 110px; border-bottom: 1px solid var(--line); }
 .profile-heading { display: flex; margin-bottom: 70px; align-items: flex-end; justify-content: space-between; gap: 40px; }
-.profile-code { display: block; color: var(--muted); font-size: 9px; letter-spacing: 0.24em; }
+.profile-code { display: block; color: var(--muted); font-size: 10px; letter-spacing: 0.24em; }
 .profile-heading h2 { margin-top: 16px; font-family: 'Noto Serif SC', 'Songti SC', 'STSong', serif; font-size: clamp(38px, 4.4vw, 64px); font-weight: 400; letter-spacing: 0.1em; }
 .profile-heading h2 + p { margin-top: 16px; color: var(--muted); font-family: 'Noto Serif SC', 'Songti SC', 'STSong', serif; font-size: 13px; letter-spacing: 0.1em; }
 .profile-tools { display: flex; align-items: flex-end; flex-direction: column; gap: 10px; }
@@ -159,7 +159,7 @@ function submit() {
 .chart-preview { display: grid; margin-top: 28px; grid-template-columns: repeat(4, 1fr); border-block: 1px solid var(--line); }
 .chart-preview span { display: flex; padding: 18px 8px; align-items: center; flex-direction: column; gap: 8px; font-family: 'Noto Serif SC', 'Songti SC', 'STSong', serif; font-size: 22px; }
 .chart-preview span + span { border-left: 1px solid var(--line); }
-.chart-preview small { color: var(--muted); font-family: 'DM Sans', sans-serif; font-size: 9px; }
+.chart-preview small { color: var(--muted); font-family: 'DM Sans', sans-serif; font-size: 10px; }
 .birth-error { margin-top: 18px; color: var(--ink); font-size: 12px; }
 .birth-actions { display: flex; margin-top: 30px; flex-wrap: wrap; gap: 12px; }
 

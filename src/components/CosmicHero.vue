@@ -40,19 +40,52 @@ let sun
 let sunGlow
 let sunLine
 let secondHand
+let orbitParticles
 let bloom
 let baseScale = 1
 let initialized = false
 let animationActive = false
+let inViewport = false
+let componentActive = true
 let motionQuery
 let introTimeline
 let scrollTween
 let resizeObserver
+let intersectionObserver
+let interactionsTarget
 let nowTimer
+let particleHighlight = 0
+let targetParticleHighlight = 0
+const MIN_CAMERA_DISTANCE = 8.2
+const MAX_CAMERA_DISTANCE = 11.5
+const DEFAULT_CAMERA_DISTANCE = 10
 const timer = new THREE.Timer()
 const motion = { progress: 0 }
 const pointer = { x: 0, y: 0 }
 const targetPointer = { x: 0, y: 0 }
+const orbit = {
+  x: 0,
+  y: 0,
+  targetX: 0,
+  targetY: 0,
+  velocityX: 0,
+  velocityY: 0,
+  zoom: 0,
+  targetZoom: 0
+}
+const drag = {
+  pointerId: null,
+  pointerType: '',
+  dragging: false,
+  startX: 0,
+  startY: 0,
+  lastX: 0,
+  lastY: 0,
+  lastTime: 0
+}
+const projectionCenter = new THREE.Vector3()
+const projectionPoint = new THREE.Vector3()
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
 
 function makeTextSprite(text) {
   const canvas = document.createElement('canvas')
@@ -133,7 +166,47 @@ function makeFlow(phase, opacity) {
   }))
 }
 
+function makeOrbitParticles(compact) {
+  const positions = []
+  const colors = []
+  const count = compact ? 190 : 360
+  for (let index = 0; index < count; index++) {
+    const angle = Math.random() * Math.PI * 2
+    const radius = 2.66 + (Math.random() - 0.5) * 0.12
+    const brightness = 0.62 + Math.random() * 0.38
+    positions.push(
+      Math.cos(angle) * radius,
+      Math.sin(angle) * radius,
+      (Math.random() - 0.5) * 0.055
+    )
+    colors.push(brightness, brightness, brightness)
+  }
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3))
+  return new THREE.Points(geometry, new THREE.PointsMaterial({
+    color: 0xf4f5f7,
+    map: makeGlowTexture(),
+    size: compact ? 0.024 : 0.02,
+    transparent: true,
+    opacity: 0.2,
+    depthWrite: false,
+    vertexColors: true,
+    blending: THREE.AdditiveBlending
+  }))
+}
+
+function hasWebGLSupport() {
+  try {
+    const probe = document.createElement('canvas')
+    return Boolean(probe.getContext('webgl2') || probe.getContext('webgl'))
+  } catch {
+    return false
+  }
+}
+
 function initScene() {
+  if (!hasWebGLSupport()) throw new Error('WebGL unavailable')
   const host = canvasHost.value
   const width = host.clientWidth || window.innerWidth
   const height = host.clientHeight || window.innerHeight
@@ -158,7 +231,7 @@ function initScene() {
   const keyLight = new THREE.PointLight(0xffffff, 42, 24)
   keyLight.position.set(4, 3, 5)
   scene.add(keyLight)
-  const rimLight = new THREE.PointLight(0xb8c5ff, 28, 20)
+  const rimLight = new THREE.PointLight(0xf4f4f2, 28, 20)
   rimLight.position.set(-4, -1, 3)
   scene.add(rimLight)
 
@@ -174,7 +247,7 @@ function initScene() {
   const starsGeometry = new THREE.BufferGeometry()
   starsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starPositions, 3))
   starfield = new THREE.Points(starsGeometry, new THREE.PointsMaterial({
-    color: 0xe9edff, size: 0.025, transparent: true, opacity: 0.7, depthWrite: false
+    color: 0xf4f4f2, size: 0.025, transparent: true, opacity: 0.7, depthWrite: false
   }))
   scene.add(starfield)
 
@@ -182,6 +255,8 @@ function initScene() {
   scene.add(instrument)
   outerRing = makeRing(2.62, 0.008, 0.72)
   instrument.add(outerRing)
+  orbitParticles = makeOrbitParticles(width < 800)
+  instrument.add(orbitParticles)
   instrument.add(makeRing(2.12, 0.005, 0.2))
   instrument.add(makeRing(1.08, 0.005, 0.16))
 
@@ -210,8 +285,11 @@ function initScene() {
     new THREE.MeshStandardMaterial({ color: 0x050506, metalness: 0.96, roughness: 0.18 })
   )
   instrument.add(core)
+  const coreDetail = new THREE.IcosahedronGeometry(0.79, 2)
+  const coreWireGeometry = new THREE.WireframeGeometry(coreDetail)
+  coreDetail.dispose()
   const coreWire = new THREE.LineSegments(
-    new THREE.WireframeGeometry(new THREE.IcosahedronGeometry(0.79, 2)),
+    coreWireGeometry,
     new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.09, depthWrite: false })
   )
   instrument.add(coreWire)
@@ -252,8 +330,10 @@ function resize() {
   const height = canvasHost.value.clientHeight
   if (!width || !height) return
   const compact = width < 800
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, compact ? 1.25 : 1.75))
+  const pixelRatio = Math.min(window.devicePixelRatio || 1, compact ? 1.35 : 1.75)
+  renderer.setPixelRatio(pixelRatio)
   renderer.setSize(width, height, false)
+  composer.setPixelRatio(pixelRatio)
   composer.setSize(width, height)
   camera.aspect = width / height
   camera.updateProjectionMatrix()
@@ -261,6 +341,7 @@ function resize() {
   baseScale = compact ? 0.76 : 1
   instrument.scale.setScalar(baseScale)
   bloom.strength = compact ? 0.58 : 0.75
+  if (initialized && !animationActive && isRenderable()) renderStatic()
 }
 
 function updateSolarPosition() {
@@ -277,43 +358,82 @@ function updateSolarPosition() {
   attribute.needsUpdate = true
 }
 
+function baseCameraDistance() {
+  return DEFAULT_CAMERA_DISTANCE - motion.progress * (DEFAULT_CAMERA_DISTANCE - MIN_CAMERA_DISTANCE)
+}
+
+function updateScene(elapsed, delta, animated) {
+  const progress = motion.progress
+  if (animated) {
+    if (!drag.dragging) {
+      orbit.targetY += orbit.velocityY * delta
+      orbit.targetX = clamp(orbit.targetX + orbit.velocityX * delta, -1.15, 1.15)
+      const damping = Math.exp(-4.8 * delta)
+      orbit.velocityX *= damping
+      orbit.velocityY *= damping
+      if (Math.abs(orbit.velocityX) < 0.002) orbit.velocityX = 0
+      if (Math.abs(orbit.velocityY) < 0.002) orbit.velocityY = 0
+    }
+    const rotationEase = 1 - Math.exp(-13 * delta)
+    const pointerEase = 1 - Math.exp(-2.2 * delta)
+    orbit.x += (orbit.targetX - orbit.x) * rotationEase
+    orbit.y += (orbit.targetY - orbit.y) * rotationEase
+    orbit.zoom += (orbit.targetZoom - orbit.zoom) * (1 - Math.exp(-10 * delta))
+    pointer.x += (targetPointer.x - pointer.x) * pointerEase
+    pointer.y += (targetPointer.y - pointer.y) * pointerEase
+    particleHighlight += (targetParticleHighlight - particleHighlight) * (1 - Math.exp(-7 * delta))
+  } else {
+    orbit.x = orbit.targetX
+    orbit.y = orbit.targetY
+    orbit.zoom = orbit.targetZoom
+    particleHighlight = targetParticleHighlight
+  }
+
+  const animationTime = animated ? elapsed : 0
+  const pointerX = animated ? pointer.x : 0
+  const pointerY = animated ? pointer.y : 0
+  instrument.rotation.x = 0.12 + progress * 0.62 + pointerY * 0.08 + orbit.x
+  instrument.rotation.y = -0.16 + progress * 1.28 + animationTime * 0.018 + pointerX * 0.1 + orbit.y
+  instrument.rotation.z = progress * 0.28
+  instrument.scale.setScalar(baseScale * (1 + progress * 0.3))
+  orbitA.rotation.z = 0.2 + animationTime * 0.065
+  orbitB.rotation.z = -0.35 - animationTime * 0.05
+  outerRing.rotation.z = animationTime * 0.012
+  orbitParticles.rotation.z = animationTime * 0.085
+  orbitParticles.material.opacity = 0.2 + particleHighlight * 0.26
+  core.rotation.y = animationTime * 0.12
+  flowA.rotation.z = animationTime * 0.045
+  flowB.rotation.z = -animationTime * 0.035
+  timeTicks.rotation.z = -(getTrueSolarTime(now.value, store.location.longitude) / 1440) * Math.PI * 2 - progress * 0.5
+  secondHand.rotation.z = -(now.value.getSeconds() / 60) * Math.PI * 2
+  starfield.rotation.y = animationTime * 0.003 + progress * 0.18
+  starfield.rotation.x = progress * 0.08
+  sunGlow.material.opacity = animated ? 0.72 + Math.sin(elapsed * 1.8) * 0.12 : 0.78
+  updateSolarPosition()
+
+  if (animated) {
+    const cameraEase = 1 - Math.exp(-2.2 * delta)
+    camera.position.x += (pointerX * 0.32 - camera.position.x) * cameraEase
+    camera.position.y += (-pointerY * 0.24 + progress * 0.35 - camera.position.y) * cameraEase
+  } else {
+    camera.position.x = 0
+    camera.position.y = progress * 0.35
+  }
+  camera.position.z = clamp(baseCameraDistance() + orbit.zoom, MIN_CAMERA_DISTANCE, MAX_CAMERA_DISTANCE)
+  camera.lookAt(instrument.position.x * 0.2, 0, 0)
+}
+
 function renderStatic() {
   if (!initialized) return
-  updateSolarPosition()
-  timeTicks.rotation.z = -(getTrueSolarTime(now.value, store.location.longitude) / 1440) * Math.PI * 2
-  secondHand.rotation.z = -(now.value.getSeconds() / 60) * Math.PI * 2
+  updateScene(timer.getElapsed(), 0, false)
   composer.render()
 }
 
 function animate() {
-  if (!animationActive || document.hidden) return
+  if (!animationActive) return
   timer.update()
-  const elapsed = timer.getElapsed()
-  const progress = motion.progress
-  pointer.x += (targetPointer.x - pointer.x) * 0.035
-  pointer.y += (targetPointer.y - pointer.y) * 0.035
-
-  instrument.rotation.x = 0.12 + progress * 0.62 + pointer.y * 0.08
-  instrument.rotation.y = -0.16 + progress * 1.28 + elapsed * 0.018 + pointer.x * 0.1
-  instrument.rotation.z = progress * 0.28
-  instrument.scale.setScalar(baseScale * (1 + progress * 0.3))
-  orbitA.rotation.z = 0.2 + elapsed * 0.065
-  orbitB.rotation.z = -0.35 - elapsed * 0.05
-  outerRing.rotation.z = elapsed * 0.012
-  core.rotation.y = elapsed * 0.12
-  flowA.rotation.z = elapsed * 0.045
-  flowB.rotation.z = -elapsed * 0.035
-  timeTicks.rotation.z = -(getTrueSolarTime(now.value, store.location.longitude) / 1440) * Math.PI * 2 - progress * 0.5
-  secondHand.rotation.z = -(now.value.getSeconds() / 60) * Math.PI * 2
-  starfield.rotation.y = elapsed * 0.003 + progress * 0.18
-  starfield.rotation.x = progress * 0.08
-  sunGlow.material.opacity = 0.72 + Math.sin(elapsed * 1.8) * 0.12
-  updateSolarPosition()
-
-  camera.position.x += (pointer.x * 0.32 - camera.position.x) * 0.035
-  camera.position.y += (-pointer.y * 0.24 + progress * 0.35 - camera.position.y) * 0.035
-  camera.position.z = 10 - progress * 2.25
-  camera.lookAt(instrument.position.x * 0.2, 0, 0)
+  const delta = clamp(timer.getDelta(), 1 / 240, 0.05)
+  updateScene(timer.getElapsed(), delta, true)
   composer.render()
 }
 
@@ -333,13 +453,140 @@ function setupMotion() {
   })
 }
 
-function start() {
-  if (!initialized || animationActive) return
-  animationActive = true
-  if (motionQuery.matches) {
-    renderStatic()
-    return
+function isRenderable() {
+  return initialized && inViewport && !document.hidden && componentActive
+}
+
+function clearDrag(preserveVelocity = false) {
+  const canvas = interactionsTarget
+  const pointerId = drag.pointerId
+  drag.pointerId = null
+  drag.pointerType = ''
+  drag.dragging = false
+  canvasHost.value?.classList.remove('is-dragging')
+  if (canvas && pointerId !== null && canvas.hasPointerCapture(pointerId)) {
+    canvas.releasePointerCapture(pointerId)
   }
+  window.removeEventListener('wheel', handleWheel)
+  if (!preserveVelocity) {
+    orbit.velocityX = 0
+    orbit.velocityY = 0
+  }
+}
+
+function beginDrag(event) {
+  drag.dragging = true
+  drag.lastX = event.clientX
+  drag.lastY = event.clientY
+  drag.lastTime = event.timeStamp
+  orbit.velocityX = 0
+  orbit.velocityY = 0
+  canvasHost.value?.classList.add('is-dragging')
+  interactionsTarget.setPointerCapture(event.pointerId)
+  window.addEventListener('wheel', handleWheel, { passive: false })
+}
+
+function handlePointerDown(event) {
+  if (drag.pointerId !== null || !event.isPrimary) return
+  if (event.pointerType !== 'touch' && event.button !== 0) return
+  drag.pointerId = event.pointerId
+  drag.pointerType = event.pointerType
+  drag.startX = drag.lastX = event.clientX
+  drag.startY = drag.lastY = event.clientY
+  drag.lastTime = event.timeStamp
+  if (event.pointerType !== 'touch') beginDrag(event)
+}
+
+function handleDragMove(event) {
+  if (event.pointerId !== drag.pointerId) return
+  if (drag.pointerType === 'touch' && !drag.dragging) {
+    const totalX = event.clientX - drag.startX
+    const totalY = event.clientY - drag.startY
+    if (Math.abs(totalY) > 9 && Math.abs(totalY) > Math.abs(totalX)) {
+      clearDrag()
+      return
+    }
+    if (Math.abs(totalX) < 7 || Math.abs(totalX) < Math.abs(totalY) * 1.1) return
+    beginDrag(event)
+  }
+  if (!drag.dragging) return
+
+  const deltaX = event.clientX - drag.lastX
+  const deltaY = event.clientY - drag.lastY
+  const deltaTime = clamp((event.timeStamp - drag.lastTime) / 1000, 0.008, 0.05)
+  const rotationX = deltaY * 0.005
+  const rotationY = deltaX * 0.006
+  orbit.targetX = clamp(orbit.targetX + rotationX, -1.15, 1.15)
+  orbit.targetY += rotationY
+  orbit.velocityX = clamp(orbit.velocityX * 0.45 + rotationX / deltaTime * 0.55, -7, 7)
+  orbit.velocityY = clamp(orbit.velocityY * 0.45 + rotationY / deltaTime * 0.55, -7, 7)
+  drag.lastX = event.clientX
+  drag.lastY = event.clientY
+  drag.lastTime = event.timeStamp
+  if (motionQuery?.matches && isRenderable()) renderStatic()
+}
+
+function handlePointerEnd(event) {
+  if (event.pointerId !== drag.pointerId) return
+  const preserveVelocity = event.type === 'pointerup' && drag.dragging
+  if (event.type === 'pointerup' && event.timeStamp - drag.lastTime > 90) {
+    orbit.velocityX = 0
+    orbit.velocityY = 0
+  }
+  clearDrag(preserveVelocity)
+}
+
+function handleWheel(event) {
+  if (!drag.dragging || !initialized) return
+  event.preventDefault()
+  const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? window.innerHeight : 1
+  const distance = clamp(
+    baseCameraDistance() + orbit.targetZoom + event.deltaY * unit * 0.0025,
+    MIN_CAMERA_DISTANCE,
+    MAX_CAMERA_DISTANCE
+  )
+  orbit.targetZoom = distance - baseCameraDistance()
+  if (motionQuery?.matches && isRenderable()) renderStatic()
+}
+
+function resetOrbit() {
+  orbit.targetX = 0
+  orbit.targetY = 0
+  orbit.targetZoom = 0
+  orbit.velocityX = 0
+  orbit.velocityY = 0
+  resetPointer()
+  if (motionQuery?.matches && isRenderable()) renderStatic()
+}
+
+function setupInteractions() {
+  interactionsTarget = renderer.domElement
+  interactionsTarget.addEventListener('pointerdown', handlePointerDown)
+  interactionsTarget.addEventListener('pointermove', handleDragMove)
+  interactionsTarget.addEventListener('pointerup', handlePointerEnd)
+  interactionsTarget.addEventListener('pointercancel', handlePointerEnd)
+  interactionsTarget.addEventListener('lostpointercapture', handlePointerEnd)
+  interactionsTarget.addEventListener('dblclick', resetOrbit)
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+}
+
+function removeInteractions() {
+  if (interactionsTarget) {
+    interactionsTarget.removeEventListener('pointerdown', handlePointerDown)
+    interactionsTarget.removeEventListener('pointermove', handleDragMove)
+    interactionsTarget.removeEventListener('pointerup', handlePointerEnd)
+    interactionsTarget.removeEventListener('pointercancel', handlePointerEnd)
+    interactionsTarget.removeEventListener('lostpointercapture', handlePointerEnd)
+    interactionsTarget.removeEventListener('dblclick', resetOrbit)
+  }
+  window.removeEventListener('wheel', handleWheel)
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
+  interactionsTarget = null
+}
+
+function start() {
+  if (!initialized || animationActive || !isRenderable() || motionQuery?.matches) return
+  animationActive = true
   timer.reset()
   scrollTween?.scrollTrigger.enable()
   renderer.setAnimationLoop(animate)
@@ -348,31 +595,71 @@ function start() {
 function stop() {
   if (!initialized) return
   animationActive = false
+  clearDrag()
   renderer.setAnimationLoop(null)
   scrollTween?.scrollTrigger.disable(false)
 }
 
+function syncRendering() {
+  if (!initialized) return
+  const renderStaticFrame = isRenderable() && motionQuery?.matches
+  if (!isRenderable() || motionQuery?.matches) {
+    stop()
+    if (renderStaticFrame) renderStatic()
+    return
+  }
+  start()
+}
+
+function updateParticleProximity(event) {
+  if (!instrument || !camera || !interactionsTarget) return
+  const bounds = interactionsTarget.getBoundingClientRect()
+  if (!bounds.width || !bounds.height) return
+  projectionCenter.copy(instrument.position).project(camera)
+  const centerX = bounds.left + (projectionCenter.x + 1) * bounds.width * 0.5
+  const centerY = bounds.top + (1 - projectionCenter.y) * bounds.height * 0.5
+  let radius = 0
+  for (let index = 0; index < 8; index++) {
+    const angle = index / 8 * Math.PI * 2
+    projectionPoint.set(Math.cos(angle) * 2.66, Math.sin(angle) * 2.66, 0)
+    instrument.localToWorld(projectionPoint)
+    projectionPoint.project(camera)
+    const pointX = bounds.left + (projectionPoint.x + 1) * bounds.width * 0.5
+    const pointY = bounds.top + (1 - projectionPoint.y) * bounds.height * 0.5
+    radius += Math.hypot(pointX - centerX, pointY - centerY) / 8
+  }
+  const distance = Math.hypot(event.clientX - centerX, event.clientY - centerY)
+  targetParticleHighlight = clamp(1 - Math.abs(distance - radius) / Math.max(42, radius * 0.32), 0, 1)
+}
+
 function handlePointer(event) {
   if (motionQuery?.matches || event.pointerType === 'touch') return
-  const bounds = root.value.getBoundingClientRect()
-  targetPointer.x = (event.clientX / bounds.width - 0.5) * 2
-  targetPointer.y = (event.clientY / Math.max(window.innerHeight, 1) - 0.5) * 2
+  const bounds = interactionsTarget?.getBoundingClientRect() || root.value.getBoundingClientRect()
+  if (!bounds.width || !bounds.height) return
+  targetPointer.x = clamp((event.clientX - bounds.left) / bounds.width * 2 - 1, -1, 1)
+  targetPointer.y = clamp((event.clientY - bounds.top) / bounds.height * 2 - 1, -1, 1)
+  updateParticleProximity(event)
 }
 
 function resetPointer() {
   targetPointer.x = 0
   targetPointer.y = 0
+  targetParticleHighlight = 0
+}
+
+function handleVisibilityChange() {
+  syncRendering()
 }
 
 function handleMotionChange() {
   introTimeline?.progress(1).kill()
-  stop()
+  introTimeline = null
   if (!motionQuery.matches && !scrollTween) setupMotion()
-  start()
+  syncRendering()
 }
 
-watch(position, () => {
-  if (animationActive && motionQuery?.matches) renderStatic()
+watch(() => [store.location.latitude, store.location.longitude], () => {
+  if (motionQuery?.matches && isRenderable()) renderStatic()
 })
 
 function scrollToProfile() {
@@ -386,21 +673,36 @@ onMounted(() => {
   nowTimer = window.setInterval(() => { now.value = new Date() }, 1000)
   try {
     initScene()
+    setupInteractions()
+    intersectionObserver = new IntersectionObserver(([entry]) => {
+      inViewport = entry.isIntersecting
+      syncRendering()
+    }, { threshold: 0 })
+    intersectionObserver.observe(canvasHost.value)
     setupMotion()
-    start()
+    syncRendering()
   } catch {
     webglFailed.value = true
   }
 })
 
-onActivated(start)
-onDeactivated(stop)
+onActivated(() => {
+  componentActive = true
+  syncRendering()
+})
+onDeactivated(() => {
+  componentActive = false
+  stop()
+})
 
 onBeforeUnmount(() => {
+  componentActive = false
   window.clearInterval(nowTimer)
   motionQuery?.removeEventListener('change', handleMotionChange)
-  timer.dispose()
   stop()
+  removeInteractions()
+  intersectionObserver?.disconnect()
+  timer.dispose()
   introTimeline?.kill()
   scrollTween?.scrollTrigger.kill()
   scrollTween?.kill()
@@ -415,6 +717,7 @@ onBeforeUnmount(() => {
       })
     })
   }
+  composer?.passes.forEach(pass => pass.dispose?.())
   composer?.dispose()
   renderer?.dispose()
   renderer?.domElement.remove()
@@ -455,10 +758,11 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.cosmic-hero { position: relative; height: 175vh; min-height: 1000px; background: #030304; }
-.hero-stage { position: sticky; top: 0; height: 100svh; min-height: 640px; overflow: hidden; background: #030304; }
+.cosmic-hero { position: relative; height: 150vh; min-height: 100svh; background: #030304; }
+.hero-stage { position: sticky; top: 0; height: 100svh; min-height: min(600px,100svh); overflow: hidden; background: #030304; }
 .webgl-stage {
   position: absolute;
+  z-index: 0;
   inset: 0;
   background:
     radial-gradient(circle at 18% 28%, rgba(255,255,255,0.4) 0 1px, transparent 1.5px),
@@ -466,7 +770,8 @@ onBeforeUnmount(() => {
     #030304;
   background-size: 173px 181px, 229px 237px, auto;
 }
-.webgl-stage :deep(canvas) { display: block; width: 100%; height: 100%; }
+.webgl-stage :deep(canvas) { display: block; width: 100%; height: 100%; opacity: 0.34; mix-blend-mode: screen; cursor: grab; touch-action: pan-y; }
+.webgl-stage.is-dragging :deep(canvas) { cursor: grabbing; }
 .hero-vignette {
   position: absolute;
   inset: 0;
@@ -518,13 +823,12 @@ onBeforeUnmount(() => {
   cursor: pointer;
   font-size: 13px;
   letter-spacing: 0.12em;
-  backdrop-filter: blur(8px);
   transition: background-color 200ms ease, color 200ms ease, border-color 200ms ease;
 }
 .hero-cta span { font-size: 18px; transition: transform 200ms ease; }
 .hero-cta:hover { border-color: #f5f5f3; background: #f5f5f3; color: #080809; }
 .hero-cta:hover span { transform: translate(3px, 3px); }
-.hero-action-note { color: rgba(255,255,255,0.3); font-size: 9px; letter-spacing: 0.22em; }
+.hero-action-note { color: rgba(255,255,255,0.3); font-size: 10px; letter-spacing: 0.22em; }
 .hero-telemetry {
   display: grid;
   width: min(680px, 56%);
@@ -536,10 +840,10 @@ onBeforeUnmount(() => {
 .hero-telemetry > div { display: flex; min-width: 0; padding: 18px 18px 0; flex-direction: column; gap: 7px; }
 .hero-telemetry > div:first-child { padding-left: 0; }
 .hero-telemetry > div + div { border-left: 1px solid rgba(255,255,255,0.1); }
-.hero-telemetry span { color: rgba(255,255,255,0.35); font-size: 8px; letter-spacing: 0.22em; }
+.hero-telemetry span { color: rgba(255,255,255,0.35); font-size: 10px; letter-spacing: 0.22em; }
 .hero-telemetry strong { overflow: hidden; font-family: 'DM Sans', ui-sans-serif, system-ui, sans-serif; font-size: 17px; font-weight: 400; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
-.hero-telemetry small { color: rgba(255,255,255,0.35); font-size: 8px; letter-spacing: 0.12em; }
-.hero-edition { position: absolute; z-index: 2; top: 50%; right: 24px; color: rgba(255,255,255,0.28); font-size: 8px; letter-spacing: 0.28em; writing-mode: vertical-rl; }
+.hero-telemetry small { color: rgba(255,255,255,0.35); font-size: 10px; letter-spacing: 0.12em; }
+.hero-edition { position: absolute; z-index: 2; top: 50%; right: 24px; color: rgba(255,255,255,0.28); font-size: 10px; letter-spacing: 0.28em; writing-mode: vertical-rl; }
 .scroll-cue {
   position: absolute;
   z-index: 3;
@@ -579,12 +883,12 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 700px) {
-  .cosmic-hero { height: 145vh; min-height: 850px; }
-  .hero-stage { min-height: 600px; }
+  .cosmic-hero { height: 150vh; min-height: 100svh; }
+  .hero-stage { min-height: min(600px,100svh); }
   .hero-vignette { background: linear-gradient(0deg, rgba(3,3,4,0.96) 0%, rgba(3,3,4,0.35) 60%, rgba(3,3,4,0.5) 100%); }
   .hero-content { padding: 108px 22px 32px; justify-content: flex-end; }
   .hero-copy { max-width: 100%; }
-  .hero-kicker { margin-bottom: 16px; font-size: 8px; }
+  .hero-kicker { margin-bottom: 16px; font-size: 10px; }
   .hero-title { font-size: clamp(58px, 18vw, 84px); line-height: 0.98; }
   .hero-description { margin-top: 16px; font-size: 12px; line-height: 1.8; }
   .hero-actions { margin-top: 20px; }
@@ -598,8 +902,28 @@ onBeforeUnmount(() => {
   .webgl-fallback { top: 118px; right: 22px; bottom: auto; left: 22px; text-align: right; }
 }
 
+@media (max-height: 620px) {
+  .cosmic-hero { height: auto; min-height: 100svh; }
+  .hero-stage { position: relative; height: auto; min-height: min(600px,100svh); }
+  .hero-content { height: auto; min-height: 100svh; }
+}
+
+@media (max-height: 620px) and (min-width: 701px) {
+  .hero-content { padding: 88px 48px 32px; }
+  .hero-title { font-size: clamp(48px, 8vw, 76px); }
+  .hero-kicker { margin-bottom: 12px; }
+  .hero-description { margin-top: 12px; line-height: 1.7; }
+  .hero-actions { margin-top: 16px; }
+  .hero-telemetry { margin-top: 24px; }
+  .scroll-cue { display: none; }
+}
+
 @media (max-width: 700px) and (max-height: 620px) {
-  .hero-content { padding-bottom: 57px; }
+  .hero-content { padding: 84px 22px 40px; }
+  .hero-title { font-size: clamp(46px, 15vw, 64px); }
+  .hero-description { margin-top: 12px; }
+  .hero-actions { margin-top: 16px; }
+  .hero-telemetry { margin-top: 20px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

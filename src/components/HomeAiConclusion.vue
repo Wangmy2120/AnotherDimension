@@ -119,7 +119,7 @@ onBeforeUnmount(() => controller?.abort())
 .conclusion-orbit i:first-child { inset: 30%; border-color: var(--line); }
 .conclusion-orbit i:nth-child(2) { inset: -5%; border-color: var(--line); transform: rotateX(66deg) rotateZ(-18deg); }
 .conclusion-orbit span { font-family: 'Noto Serif SC', 'Songti SC', 'STSong', serif; font-size: 58px; font-weight: 300; }
-.conclusion-code { color: var(--muted); font-size: 9px; letter-spacing: 0.24em; }
+.conclusion-code { color: var(--muted); font-size: 10px; letter-spacing: 0.24em; }
 .conclusion-copy h2 { margin-top: 18px; font-family: 'Noto Serif SC', 'Songti SC', 'STSong', serif; font-size: clamp(48px, 5.6vw, 78px); font-weight: 400; letter-spacing: 0.12em; }
 .conclusion-lead { max-width: 540px; margin-top: 24px; color: var(--ink-soft); font-family: 'Noto Serif SC', 'Songti SC', 'STSong', serif; font-size: 15px; line-height: 2; }
 .context-list { display: flex; margin-top: 30px; flex-wrap: wrap; gap: 8px; }

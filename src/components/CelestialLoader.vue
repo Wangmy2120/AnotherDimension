@@ -1,15 +1,17 @@
 <script setup>
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { subscribeMotion } from '../lib/motion.js'
 
 const props = defineProps({ ready: { type: Boolean, default: false } })
 const emit = defineEmits(['finished'])
 
 const canvas = ref(null)
 const complete = ref(false)
+const percent = ref(0)
 
 let context
 let particles = []
-let animationFrame
+let unsubscribeMotion
 let resizeObserver
 let finishTimer
 let exitTimer
@@ -201,6 +203,10 @@ function drawInstrument(elapsed, birth, unit, center) {
 function drawFrame(timestamp, staticFrame = false) {
   if (!context) return
   const elapsed = staticFrame ? 3000 : timestamp - started
+  if (!complete.value) {
+    const nextPercent = staticFrame ? 100 : Math.min(96, Math.floor(ease(elapsed / 1550) * 96))
+    if (percent.value !== nextPercent) percent.value = nextPercent
+  }
   const birth = ease(elapsed / 620)
   const morph = ease((elapsed - 950) / 800)
   const center = canvasSize / 2
@@ -243,11 +249,6 @@ function drawFrame(timestamp, staticFrame = false) {
   }
 }
 
-function animate(timestamp) {
-  drawFrame(timestamp)
-  animationFrame = window.requestAnimationFrame(animate)
-}
-
 function resize() {
   if (!canvas.value) return
   canvasSize = canvas.value.clientWidth || 340
@@ -265,8 +266,9 @@ function finish() {
   const elapsed = performance.now() - started
   const delay = Math.max(0, (reducedMotion ? 0 : 1850) - elapsed)
   finishTimer = window.setTimeout(() => {
+    percent.value = 100
     complete.value = true
-    exitTimer = window.setTimeout(() => emit('finished'), reducedMotion ? 20 : 420)
+    exitTimer = window.setTimeout(() => emit('finished'), reducedMotion ? 20 : 620)
   }, delay)
 }
 
@@ -284,13 +286,13 @@ onMounted(() => {
   if (reducedMotion) {
     drawFrame(started + 3000, true)
   } else {
-    animationFrame = window.requestAnimationFrame(animate)
+    unsubscribeMotion = subscribeMotion(time => drawFrame(time))
   }
   if (props.ready) finish()
 })
 
 onBeforeUnmount(() => {
-  window.cancelAnimationFrame(animationFrame)
+  unsubscribeMotion?.()
   window.clearTimeout(finishTimer)
   window.clearTimeout(exitTimer)
   resizeObserver?.disconnect()
@@ -302,37 +304,38 @@ onBeforeUnmount(() => {
     class="celestial-loader"
     :class="{ 'loader--complete': complete }"
     role="status"
-    aria-label="页面加载中"
+    :aria-label="`页面加载中 ${percent}%`"
   >
-    <canvas ref="canvas" class="loader-canvas" aria-hidden="true"></canvas>
+    <div class="loader-content">
+      <div class="loader-instrument">
+        <canvas ref="canvas" class="loader-canvas" aria-hidden="true"></canvas>
+        <svg class="taiji-seal" viewBox="0 0 100 100" aria-hidden="true">
+          <circle cx="50" cy="50" r="46" />
+          <path d="M50 4a46 46 0 0 1 0 92 23 23 0 0 1 0-46 23 23 0 0 0 0-46Z" />
+          <circle cx="50" cy="27" r="3" /><circle cx="50" cy="73" r="3" />
+        </svg>
+      </div>
+      <div class="loader-percent" aria-hidden="true"><span>{{ String(percent).padStart(3, '0') }}</span><small>%</small></div>
+      <p class="loader-motto" aria-hidden="true"><span v-for="(character, index) in '观时 · 知位 · 见天地'" :key="index" :style="{ '--char': index }">{{ character === ' ' ? ' ' : character }}</span></p>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.celestial-loader {
-  position: fixed;
-  inset: 0;
-  z-index: 200;
-  display: grid;
-  place-items: center;
-  background: rgba(3, 3, 4, 0.88);
-  backdrop-filter: blur(18px);
-  opacity: 1;
-  visibility: visible;
-  transition: opacity 420ms cubic-bezier(0.65, 0, 0.35, 1), visibility 0s linear 420ms;
-}
-.loader-canvas {
-  display: block;
-  width: min(68vw, 300px);
-  aspect-ratio: 1;
-  filter: drop-shadow(0 0 32px rgba(255, 255, 255, 0.05));
-  transition: transform 420ms cubic-bezier(0.65, 0, 0.35, 1), filter 420ms ease;
-}
-.loader--complete { opacity: 0; visibility: hidden; pointer-events: none; }
-.loader--complete .loader-canvas { transform: scale(1.35); filter: blur(4px); }
-
-@media (prefers-reduced-motion: reduce) {
-  .celestial-loader,
-  .loader-canvas { transition: none; }
-}
+.celestial-loader { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; overflow: hidden; background: rgba(3, 3, 4, 0.96); clip-path: inset(0 0 0 0); transition: clip-path 600ms cubic-bezier(0.76, 0, 0.24, 1), visibility 0s linear 600ms; }
+.loader-content { position: relative; display: grid; width: min(84vw, 540px); place-items: center; transition: opacity 300ms ease, transform 600ms cubic-bezier(0.76, 0, 0.24, 1); }
+.loader-instrument { position: relative; width: min(64vw, 310px); aspect-ratio: 1; }
+.loader-canvas { display: block; width: 100%; height: 100%; filter: drop-shadow(0 0 32px rgba(255, 255, 255, 0.06)); }
+.taiji-seal { position: absolute; inset: 19%; width: 62%; height: 62%; fill: none; stroke: oklch(0.97 0 0 / 0.28); stroke-width: 0.65; stroke-dasharray: 310; stroke-dashoffset: 310; animation: seal-draw 1.4s 0.2s ease forwards; }
+.loader-percent { position: absolute; right: 0; bottom: 4%; display: flex; align-items: flex-start; color: var(--glow); font-variant-numeric: tabular-nums; line-height: 0.8; }
+.loader-percent > span { font-family: 'DM Sans', sans-serif; font-size: clamp(70px, 12vw, 142px); font-weight: 200; letter-spacing: -0.08em; }
+.loader-percent small { margin: 4px 0 0 12px; color: var(--silver); font-size: 12px; letter-spacing: 0.1em; }
+.loader-motto { position: absolute; bottom: 0; left: 0; display: flex; color: var(--silver); font-family: 'Noto Serif SC', 'Songti SC', serif; font-size: 12px; letter-spacing: 0.18em; white-space: nowrap; }
+.loader-motto span { display: inline-block; opacity: 0; transform: translateY(12px); animation: character-in 480ms ease forwards; animation-delay: calc(280ms + var(--char) * 55ms); }
+.loader--complete { clip-path: inset(0 0 100% 0); pointer-events: none; }
+.loader--complete .loader-content { opacity: 0; transform: translateY(-30px) scale(1.06); }
+@keyframes seal-draw { to { stroke-dashoffset: 0; } }
+@keyframes character-in { to { opacity: 1; transform: translateY(0); } }
+@media (max-width: 600px) { .loader-content { width: 86vw; } .loader-percent { right: 4px; bottom: 12%; } .loader-motto { bottom: 2%; } }
+@media (prefers-reduced-motion: reduce) { .celestial-loader, .loader-content { transition: none; } .taiji-seal { stroke-dashoffset: 0; animation: none; } .loader-motto span { opacity: 1; transform: none; animation: none; } }
 </style>

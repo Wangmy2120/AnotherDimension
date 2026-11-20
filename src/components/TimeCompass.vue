@@ -133,17 +133,17 @@ onBeforeUnmount(() => window.clearInterval(timer))
 .telemetry-panel { padding: 32px 0; border-block: 1px solid rgba(255,255,255,0.16); }
 .panel-heading,
 .location-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
-.panel-code { display: block; margin-bottom: 10px; color: rgba(255,255,255,0.34); font-size: 9px; letter-spacing: 0.24em; }
+.panel-code { display: block; margin-bottom: 10px; color: rgba(255,255,255,0.34); font-size: 10px; letter-spacing: 0.24em; }
 .panel-heading h2 { font-family: 'Noto Serif SC', 'Songti SC', 'STSong', serif; font-size: 28px; font-weight: 400; letter-spacing: 0.14em; }
 .live-indicator { display: flex; align-items: center; gap: 8px; color: rgba(255,255,255,0.45); font-size: 10px; letter-spacing: 0.12em; }
 .live-indicator i { width: 5px; height: 5px; border-radius: 50%; background: #f5f5f3; box-shadow: 0 0 12px rgba(255,255,255,0.75); animation: live-pulse 2s ease-in-out infinite; }
 .telemetry-main { display: grid; margin: 42px 0 36px; grid-template-columns: 1.05fr 0.95fr; align-items: end; gap: 42px; }
-.metric-label { color: rgba(255,255,255,0.36); font-size: 9px; letter-spacing: 0.18em; }
+.metric-label { color: rgba(255,255,255,0.36); font-size: 10px; letter-spacing: 0.18em; }
 .azimuth-value { margin-top: 8px; font-family: 'DM Sans', ui-sans-serif, system-ui, sans-serif; font-size: clamp(68px, 7.6vw, 112px); font-weight: 300; font-variant-numeric: tabular-nums; letter-spacing: -0.065em; line-height: 1; }
 .azimuth-value sup { margin-left: 4px; color: rgba(255,255,255,0.42); font-size: 0.28em; font-weight: 300; vertical-align: top; }
 .azimuth-block p { margin-top: 10px; color: rgba(255,255,255,0.45); font-size: 11px; letter-spacing: 0.12em; }
 .metric-rulers { display: flex; padding-bottom: 8px; flex-direction: column; gap: 26px; }
-.ruler-label { display: flex; margin-bottom: 9px; justify-content: space-between; gap: 12px; color: rgba(255,255,255,0.38); font-size: 9px; letter-spacing: 0.1em; }
+.ruler-label { display: flex; margin-bottom: 9px; justify-content: space-between; gap: 12px; color: rgba(255,255,255,0.38); font-size: 10px; letter-spacing: 0.1em; }
 .ruler-track { height: 2px; background: rgba(255,255,255,0.1); }
 .ruler-track i { display: block; height: 100%; background: rgba(255,255,255,0.8); box-shadow: 0 0 10px rgba(255,255,255,0.24); transition: width 800ms linear; }
 .horizon-state { color: rgba(255,255,255,0.55); font-size: 11px; }
@@ -151,7 +151,7 @@ onBeforeUnmount(() => window.clearInterval(timer))
 .telemetry-grid > div { display: flex; padding: 18px 14px; flex-direction: column; gap: 6px; }
 .telemetry-grid > div:first-child { padding-left: 0; }
 .telemetry-grid > div + div { border-left: 1px solid rgba(255,255,255,0.1); }
-.telemetry-grid span { color: rgba(255,255,255,0.34); font-size: 9px; letter-spacing: 0.12em; }
+.telemetry-grid span { color: rgba(255,255,255,0.34); font-size: 10px; letter-spacing: 0.12em; }
 .telemetry-grid strong { font-family: 'DM Sans', ui-sans-serif, system-ui, sans-serif; font-size: 18px; font-weight: 400; font-variant-numeric: tabular-nums; }
 .location-copy { display: flex; min-width: 0; flex-direction: column; gap: 5px; }
 .location-copy strong { font-size: 12px; font-weight: 500; }
