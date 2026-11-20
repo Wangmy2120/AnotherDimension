@@ -3,6 +3,7 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { gsap } from 'gsap'
 import { subscribeMotion } from '../lib/motion.js'
 import { sound } from '../lib/sound.js'
+import { createInkBrushSprites } from '../lib/inkTexture.js'
 
 const props = defineProps({
   home: { type: Boolean, default: false },
@@ -16,7 +17,7 @@ const cursorLabel = ref('')
 const cursorVisible = ref(false)
 
 let context
-let sprite
+let sprites = []
 let width = 0
 let height = 0
 let ratio = 1
@@ -49,20 +50,6 @@ function random() {
 
 function mobile() {
   return window.innerWidth <= 760
-}
-
-function createSprite() {
-  sprite = document.createElement('canvas')
-  sprite.width = 128
-  sprite.height = 128
-  const ctx = sprite.getContext('2d')
-  const gradient = ctx.createRadialGradient(64, 64, 0, 64, 64, 64)
-  gradient.addColorStop(0, 'rgba(248,248,246,0.92)')
-  gradient.addColorStop(0.35, 'rgba(238,239,237,0.48)')
-  gradient.addColorStop(0.7, 'rgba(226,228,226,0.12)')
-  gradient.addColorStop(1, 'rgba(220,222,220,0)')
-  ctx.fillStyle = gradient
-  ctx.fillRect(0, 0, 128, 128)
 }
 
 function makeStars() {
@@ -106,9 +93,10 @@ function drawStatic() {
     [width * 0.94, height * 0.42, Math.min(width, height) * 0.25],
     [width * 0.14, height * 0.94, Math.min(width, height) * 0.28]
   ]
-  corners.forEach(([x, y, radius]) => {
+  corners.forEach(([x, y, radius], index) => {
     context.globalAlpha = 0.055
-    context.drawImage(sprite, x - radius, y - radius, radius * 2, radius * 2)
+    const brush = sprites[index % sprites.length] || sprites[0]
+    if (brush) context.drawImage(brush, x - radius, y - radius, radius * 2, radius * 2)
   })
   context.globalAlpha = 1
 }
@@ -129,7 +117,8 @@ function addDrop(x, y, speed = 0, options = {}) {
     maxR,
     alpha: options.alpha || Math.min(0.16, 0.085 + speed * 0.025),
     phase: random() * Math.PI * 2,
-    drift: 2 + random() * 6
+    drift: 2 + random() * 6,
+    spriteIndex: Math.floor(random() * Math.max(1, sprites.length))
   })
 }
 
@@ -259,7 +248,13 @@ function drawDrops(delta, now) {
     drop.y += drop.vy * delta + Math.cos(now * 0.001 + drop.phase) * drop.drift * 0.002 * seconds
     const fade = progress < 0.18 ? progress / 0.18 : Math.pow(1 - progress, 1.35)
     context.globalAlpha = Math.max(0, drop.alpha * fade)
-    context.drawImage(sprite, drop.x - radius, drop.y - radius, radius * 2, radius * 2)
+    const brush = sprites[drop.spriteIndex % sprites.length] || sprites[0]
+    if (!brush) continue
+    context.drawImage(brush, drop.x - radius, drop.y - radius, radius * 2, radius * 2)
+    if (drop.spriteIndex % 3 === 0) {
+      context.globalAlpha *= 0.36
+      context.drawImage(brush, drop.x - radius * 0.58, drop.y - radius * 1.2, radius * 1.35, radius * 0.9)
+    }
   }
   context.globalAlpha = 1
 }
@@ -391,7 +386,7 @@ onMounted(() => {
   finePointerQuery = window.matchMedia('(pointer: fine)')
   reducedMotion = motionQuery.matches
   finePointer = finePointerQuery.matches
-  createSprite()
+  sprites = createInkBrushSprites(6, 128)
   resizeObserver = new ResizeObserver(resize)
   resizeObserver.observe(document.documentElement)
   resize()
@@ -429,6 +424,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('scroll', handleScroll)
   window.removeEventListener('tianji:ink-pulse', handleInkPulse)
   document.removeEventListener('mouseout', handlePointerLeave)
+  sprites = []
 })
 </script>
 

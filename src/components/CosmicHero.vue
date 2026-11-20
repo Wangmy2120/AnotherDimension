@@ -6,7 +6,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { gsap } from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
-import { store } from '../store.js'
+import { dayInfo, fortune, store } from '../store.js'
 import { getSolarPosition, getTrueSolarTime } from '../lib/solar.js'
 
 gsap.registerPlugin(ScrollTrigger)
@@ -22,6 +22,12 @@ const coordinateText = computed(() => {
   return `${Math.abs(latitude).toFixed(3)}°${latitude >= 0 ? 'N' : 'S'}  ${Math.abs(longitude).toFixed(3)}°${longitude >= 0 ? 'E' : 'W'}`
 })
 const sourceLabel = computed(() => ({ default: 'BEIJING / DEFAULT', gps: 'CURRENT POSITION', manual: 'MANUAL POSITION' })[store.location.source])
+const calendarToday = computed(() => dayInfo())
+const dailyFortune = computed(() => fortune())
+
+function openAlmanac() {
+  store.tabRequest = 'almanac'
+}
 
 let renderer
 let scene
@@ -443,7 +449,7 @@ function setupMotion() {
   introTimeline = gsap.timeline({ defaults: { ease: 'power3.out' } })
     .from(hero.querySelector('.hero-kicker'), { y: 18, opacity: 0, duration: 0.8 }, 0.15)
     .from(hero.querySelectorAll('.line-inner'), { yPercent: 115, duration: 1.25, stagger: 0.12 }, 0.2)
-    .from(hero.querySelectorAll('.hero-description, .hero-actions, .hero-telemetry, .scroll-cue'), {
+    .from(hero.querySelectorAll('.hero-description, .hero-capabilities, .hero-actions, .hero-today, .hero-telemetry, .scroll-cue'), {
       y: 24, opacity: 0, duration: 0.9, stagger: 0.09
     }, 0.65)
   scrollTween = gsap.to(motion, {
@@ -732,15 +738,34 @@ onBeforeUnmount(() => {
       <div class="hero-grain" aria-hidden="true"></div>
       <div class="hero-content">
         <div class="hero-copy">
-          <p class="hero-kicker"><span></span>CELESTIAL INSTRUMENT · 001</p>
-          <h2 id="cosmic-title" class="hero-title">
+          <p class="hero-kicker"><span></span>浑仪 / CELESTIAL INSTRUMENT</p>
+          <h1 id="cosmic-title" class="hero-title">
             <span class="hero-line"><span class="line-inner">观天象</span></span>
             <span class="hero-line hero-line-indent"><span class="line-inner">定此刻</span></span>
-          </h2>
+          </h1>
           <p class="hero-description">以时间为针，以天地为盘。<br>在星辰与方位之间，重新感知此刻。</p>
+          <p class="hero-capabilities">黄历 · 八字 · 六爻 · 解梦 · 二十八宿</p>
           <div class="hero-actions">
-            <button class="hero-cta" type="button" @click="scrollToProfile">进入今日<span aria-hidden="true">↘</span></button>
+            <button class="hero-cta" type="button" @click="scrollToProfile">校准时空<span aria-hidden="true">↘</span></button>
             <span class="hero-action-note">SCROLL TO CALIBRATE</span>
+          </div>
+          <div class="hero-today" aria-label="今日历法摘要">
+            <div class="hero-today-core">
+              <span class="hero-today-kicker">TODAY / 今日</span>
+              <div class="hero-today-date">
+                <strong>{{ calendarToday.dateStr }}</strong>
+                <span>{{ calendarToday.lunarText }}</span>
+              </div>
+              <small>{{ calendarToday.dayGanZhi }}日 · {{ calendarToday.xiuName }} · {{ calendarToday.xiuLuck }} · 运势 {{ dailyFortune.overall }}</small>
+            </div>
+            <div class="hero-today-marks">
+              <span><b>宜</b>{{ calendarToday.yi.slice(0, 2).join('、') }}</span>
+              <span><b>忌</b>{{ calendarToday.ji.slice(0, 2).join('、') }}</span>
+            </div>
+            <button class="hero-today-open" type="button" @click="openAlmanac">
+              <span>今日黄历</span>
+              <i aria-hidden="true">↗</i>
+            </button>
           </div>
         </div>
 
@@ -796,7 +821,7 @@ onBeforeUnmount(() => {
   width: min(100%, 1600px);
   height: 100%;
   margin: 0 auto;
-  padding: 150px 64px 70px;
+  padding: calc(var(--header-h) + 26px) 64px 70px;
   flex-direction: column;
   justify-content: space-between;
   pointer-events: none;
@@ -809,7 +834,8 @@ onBeforeUnmount(() => {
 .hero-line-indent { padding-left: 0.72em; color: rgba(255,255,255,0.54); }
 .line-inner { display: block; }
 .hero-description { margin-top: 28px; color: rgba(255,255,255,0.58); font-family: 'Noto Serif SC', 'Songti SC', 'STSong', serif; font-size: 15px; letter-spacing: 0.12em; line-height: 2; }
-.hero-actions { display: flex; margin-top: 34px; align-items: center; gap: 22px; pointer-events: auto; }
+.hero-capabilities { margin-top: 12px; color: rgba(255,255,255,0.58); font-size: 12px; letter-spacing: 0.16em; }
+.hero-actions { display: flex; margin-top: 24px; align-items: center; gap: 22px; pointer-events: auto; }
 .hero-cta {
   display: inline-flex;
   min-height: 54px;
@@ -829,6 +855,30 @@ onBeforeUnmount(() => {
 .hero-cta:hover { border-color: #f5f5f3; background: #f5f5f3; color: #080809; }
 .hero-cta:hover span { transform: translate(3px, 3px); }
 .hero-action-note { color: rgba(255,255,255,0.3); font-size: 10px; letter-spacing: 0.22em; }
+.hero-today {
+  display: grid;
+  width: min(100%, 720px);
+  margin-top: 26px;
+  padding: 13px 0;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.9fr) auto;
+  align-items: center;
+  gap: 20px;
+  border-block: 1px solid rgba(255,255,255,0.12);
+  pointer-events: auto;
+}
+.hero-today-core { display: flex; min-width: 0; flex-direction: column; gap: 4px; }
+.hero-today-kicker { color: rgba(255,255,255,0.55); font-size: 10px; letter-spacing: 0.22em; }
+.hero-today-date { display: flex; min-width: 0; align-items: baseline; gap: 10px; white-space: nowrap; }
+.hero-today-date strong { color: var(--glow); font-family: 'DM Sans', ui-sans-serif, system-ui, sans-serif; font-size: 16px; font-weight: 400; font-variant-numeric: tabular-nums; letter-spacing: 0.06em; }
+.hero-today-date span { overflow: hidden; color: var(--silver); font-family: 'Noto Serif SC', 'Songti SC', serif; font-size: 13px; letter-spacing: 0.06em; text-overflow: ellipsis; }
+.hero-today-core small { overflow: hidden; color: rgba(255,255,255,0.68); font-size: 12px; letter-spacing: 0.06em; text-overflow: ellipsis; white-space: nowrap; }
+.hero-today-marks { display: flex; min-width: 0; padding-left: 18px; flex-direction: column; gap: 5px; border-left: 1px solid rgba(255,255,255,0.12); }
+.hero-today-marks span { display: flex; min-width: 0; gap: 9px; overflow: hidden; color: var(--silver); font-size: 12px; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
+.hero-today-marks b { flex: 0 0 auto; color: var(--glow); font-family: 'Noto Serif SC', 'Songti SC', serif; font-size: 12px; font-weight: 400; letter-spacing: 0.08em; }
+.hero-today-open { display: inline-flex; min-height: 44px; padding: 0 13px; align-items: center; gap: 11px; border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.02); color: var(--glow); cursor: pointer; font-size: 12px; letter-spacing: 0.1em; white-space: nowrap; transition: background-color 200ms ease, border-color 200ms ease; }
+.hero-today-open i { color: var(--silver); font-size: 12px; font-style: normal; transition: transform 200ms ease; }
+.hero-today-open:hover { border-color: rgba(255,255,255,0.55); background: rgba(255,255,255,0.07); }
+.hero-today-open:hover i { transform: translate(2px, -2px); }
 .hero-telemetry {
   display: grid;
   width: min(680px, 56%);
@@ -840,9 +890,9 @@ onBeforeUnmount(() => {
 .hero-telemetry > div { display: flex; min-width: 0; padding: 18px 18px 0; flex-direction: column; gap: 7px; }
 .hero-telemetry > div:first-child { padding-left: 0; }
 .hero-telemetry > div + div { border-left: 1px solid rgba(255,255,255,0.1); }
-.hero-telemetry span { color: rgba(255,255,255,0.35); font-size: 10px; letter-spacing: 0.22em; }
+.hero-telemetry span { color: rgba(255,255,255,0.5); font-size: 12px; letter-spacing: 0.16em; }
 .hero-telemetry strong { overflow: hidden; font-family: 'DM Sans', ui-sans-serif, system-ui, sans-serif; font-size: 17px; font-weight: 400; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
-.hero-telemetry small { color: rgba(255,255,255,0.35); font-size: 10px; letter-spacing: 0.12em; }
+.hero-telemetry small { color: rgba(255,255,255,0.5); font-size: 12px; letter-spacing: 0.1em; }
 .hero-edition { position: absolute; z-index: 2; top: 50%; right: 24px; color: rgba(255,255,255,0.28); font-size: 10px; letter-spacing: 0.28em; writing-mode: vertical-rl; }
 .scroll-cue {
   position: absolute;
@@ -873,26 +923,37 @@ onBeforeUnmount(() => {
   .scroll-cue { left: 36px; }
 }
 
-@media (max-height: 760px) and (min-width: 701px) {
-  .hero-content { padding: 112px 48px 38px; }
-  .hero-title { font-size: clamp(68px, 8vw, 108px); }
-  .hero-kicker { margin-bottom: 20px; }
-  .hero-description { margin-top: 18px; }
-  .hero-actions { margin-top: 22px; }
-  .scroll-cue { bottom: 24px; left: 48px; }
+@media (max-height: 850px) and (min-width: 701px) {
+  .hero-content { padding: calc(var(--header-h) + 16px) 48px 28px; }
+  .hero-title { font-size: clamp(52px, 6.4vw, 88px); }
+  .hero-kicker { margin-bottom: 12px; }
+  .hero-description { margin-top: 12px; line-height: 1.7; }
+  .hero-actions { margin-top: 14px; }
+  .hero-action-note { display: none; }
+  .hero-today { margin-top: 12px; padding-block: 9px; }
+  .hero-today-core small { display: none; }
+  .scroll-cue { bottom: 18px; left: 48px; }
+  .hero-telemetry > div { padding: 12px 14px 0; }
 }
 
 @media (max-width: 700px) {
   .cosmic-hero { height: 150vh; min-height: 100svh; }
   .hero-stage { min-height: min(600px,100svh); }
   .hero-vignette { background: linear-gradient(0deg, rgba(3,3,4,0.96) 0%, rgba(3,3,4,0.35) 60%, rgba(3,3,4,0.5) 100%); }
-  .hero-content { padding: 108px 22px 32px; justify-content: flex-end; }
+  .hero-content { padding: calc(var(--header-h) + 16px) 22px 32px; justify-content: flex-end; }
   .hero-copy { max-width: 100%; }
   .hero-kicker { margin-bottom: 16px; font-size: 10px; }
   .hero-title { font-size: clamp(58px, 18vw, 84px); line-height: 0.98; }
   .hero-description { margin-top: 16px; font-size: 12px; line-height: 1.8; }
   .hero-actions { margin-top: 20px; }
   .hero-action-note { display: none; }
+  .hero-today { margin-top: 18px; padding: 11px 0; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 14px; }
+  .hero-today-core { grid-column: 1; }
+  .hero-today-date { flex-wrap: wrap; gap: 3px 8px; white-space: normal; }
+  .hero-today-core small { display: none; }
+  .hero-today-marks { grid-column: 1; padding-left: 0; flex-direction: row; gap: 14px; border-left: 0; }
+  .hero-today-marks span { font-size: 11px; }
+  .hero-today-open { grid-column: 2; grid-row: 1 / span 2; align-self: stretch; padding-inline: 11px; justify-content: center; }
   .hero-telemetry { width: 100%; margin-top: 28px; grid-template-columns: 1fr 1fr; }
   .hero-telemetry > div { padding: 14px 10px 0; }
   .hero-telemetry > div:nth-child(3) { display: none; }
@@ -909,7 +970,7 @@ onBeforeUnmount(() => {
 }
 
 @media (max-height: 620px) and (min-width: 701px) {
-  .hero-content { padding: 88px 48px 32px; }
+  .hero-content { padding: calc(var(--header-h) + 14px) 48px 32px; }
   .hero-title { font-size: clamp(48px, 8vw, 76px); }
   .hero-kicker { margin-bottom: 12px; }
   .hero-description { margin-top: 12px; line-height: 1.7; }
@@ -919,7 +980,7 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 700px) and (max-height: 620px) {
-  .hero-content { padding: 84px 22px 40px; }
+  .hero-content { padding: calc(var(--header-h) + 12px) 22px 40px; }
   .hero-title { font-size: clamp(46px, 15vw, 64px); }
   .hero-description { margin-top: 12px; }
   .hero-actions { margin-top: 16px; }

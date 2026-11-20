@@ -1,10 +1,13 @@
 import { reactive, watch } from 'vue'
 import { todayStr, getDayInfo, getBazi } from './lib/calendar.js'
 import { getFortune } from './lib/fortune.js'
-import { loadSettings, saveSettings } from './lib/ai.js'
 import { buildResult } from './lib/hexagram.js'
 
 const PROFILE_KEY = 'tianji.profile'
+
+try {
+  localStorage.removeItem('tianji.settings')
+} catch { /* 浏览器可能禁用本地存储 */ }
 
 function loadProfile() {
   try {
@@ -37,7 +40,6 @@ function loadDreamSession() {
 export const store = reactive({
   dateStr: todayStr(),
   profile: loadProfile(),
-  settings: loadSettings(),
   location: { latitude: 39.9042, longitude: 116.4074, source: 'default' },
   aiOpen: false,
   aiContextKind: 'daily',
@@ -50,8 +52,6 @@ watch(() => store.profile, p => {
   if (p) localStorage.setItem(PROFILE_KEY, JSON.stringify(p))
   else localStorage.removeItem(PROFILE_KEY)
 }, { deep: true })
-
-watch(() => store.settings, s => saveSettings(s), { deep: true })
 
 export function dayInfo() {
   return getDayInfo(store.dateStr)

@@ -8,13 +8,6 @@ const ft = computed(() => fortune())
 
 const GAUGE_CIRCUMFERENCE = 2 * Math.PI * 52
 const SCORE_ANIMATION_MS = 400
-const LUCKY_COLOR_SWATCHES = {
-  青绿: 'oklch(0.62 0.12 165)',
-  朱红: 'oklch(0.58 0.2 28)',
-  黄棕: 'oklch(0.61 0.11 75)',
-  素白: 'oklch(0.9 0.02 95)',
-  玄蓝: 'oklch(0.4 0.1 255)'
-}
 
 const animatedOverall = ref(ft.value.overall)
 const displayedOverall = computed(() => Math.round(animatedOverall.value))
@@ -22,10 +15,6 @@ const gaugeOffset = computed(() => {
   const score = Math.max(0, Math.min(100, animatedOverall.value))
   return GAUGE_CIRCUMFERENCE * (1 - score / 100)
 })
-const luckySwatchStyle = computed(() => ({
-  backgroundColor: LUCKY_COLOR_SWATCHES[ft.value.lucky.color] || 'var(--ink-soft)'
-}))
-
 let mounted = false
 let motionQuery
 let scoreAnimationFrame = null
@@ -118,38 +107,39 @@ onBeforeUnmount(() => {
       <p class="muted" style="margin-top: 8px; line-height: 1.9; text-align: left">{{ ft.relationDesc }}</p>
     </div>
 
-    <div class="card" v-for="(c, index) in ft.categories" :key="c.name">
-      <div class="spread">
-        <span class="dimension-name">{{ c.name }}</span>
-        <span class="dimension-meta">
-          <span class="stars">{{ '★'.repeat(c.stars) }}{{ '☆'.repeat(5 - c.stars) }}</span>
-          <span class="muted small">{{ c.score }}分</span>
-        </span>
-      </div>
-      <div
-        class="dimension-track"
-        role="progressbar"
-        :aria-label="`${c.name}运势`"
-        aria-valuemin="0"
-        aria-valuemax="100"
-        :aria-valuenow="c.score"
-      >
+    <div class="fortune-dimensions">
+      <div class="card" v-for="(c, index) in ft.categories" :key="c.name">
+        <div class="spread">
+          <span class="dimension-name">{{ c.name }}</span>
+          <span class="dimension-meta">
+            <span class="stars">{{ '★'.repeat(c.stars) }}{{ '☆'.repeat(5 - c.stars) }}</span>
+            <span class="muted small">{{ c.score }}分</span>
+          </span>
+        </div>
         <div
-          class="dimension-fill"
-          :style="{ width: c.score + '%', '--dimension-order': index }"
-        ></div>
+          class="dimension-track"
+          role="progressbar"
+          :aria-label="`${c.name}运势`"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          :aria-valuenow="c.score"
+        >
+          <div
+            class="dimension-fill"
+            :style="{ width: c.score + '%', '--dimension-order': index }"
+          ></div>
+        </div>
+        <p class="muted" style="margin-top: 10px; line-height: 1.8">{{ c.tip }}</p>
       </div>
-      <p class="muted" style="margin-top: 10px; line-height: 1.8">{{ c.tip }}</p>
     </div>
 
     <div class="card">
-      <div class="card-title">开运参考</div>
+      <h2 class="card-title">开运参考</h2>
       <div class="grid2">
         <div class="kv">
           <span class="k">幸运色</span>
           <span class="lucky-color">
-            <span class="lucky-color-swatch" :style="luckySwatchStyle" aria-hidden="true"></span>
-            <span>{{ ft.lucky.color }}</span>
+            <span class="lucky-color-tag">{{ ft.lucky.color }}</span>
           </span>
         </div>
         <div class="kv"><span class="k">幸运数</span><span>{{ ft.lucky.number }}</span></div>
@@ -171,6 +161,20 @@ onBeforeUnmount(() => {
 
 .overview-card {
   text-align: center;
+}
+
+.fortune-dimensions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.fortune-dimensions .card {
+  margin-bottom: 0;
+}
+
+@media (max-width: 760px) {
+  .fortune-dimensions { grid-template-columns: 1fr; }
 }
 
 .score-gauge {
@@ -264,15 +268,18 @@ onBeforeUnmount(() => {
   display: inline-flex;
   min-width: 0;
   align-items: center;
-  gap: 8px;
 }
 
-.lucky-color-swatch {
-  width: 18px;
-  height: 18px;
-  flex: 0 0 18px;
+.lucky-color-tag {
+  display: inline-flex;
+  padding: 3px 9px;
+  align-items: center;
   border: 1px solid var(--line-strong);
-  box-shadow: inset 0 0 0 2px oklch(0.135 0 0 / 0.2);
+  background: linear-gradient(135deg, oklch(0.97 0 0 / 0.06), transparent);
+  color: var(--silver);
+  font-family: 'Noto Serif SC', 'Songti SC', serif;
+  font-size: 14px;
+  letter-spacing: 0.08em;
 }
 
 @keyframes dimension-grow {

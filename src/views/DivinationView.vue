@@ -344,7 +344,7 @@ onBeforeUnmount(() => {
 <template>
   <div class="divination-view">
     <div class="card">
-      <div class="card-title">周易摇卦 · 三钱法</div>
+      <h2 class="card-title">周易摇卦 · 三钱法</h2>
       <p class="muted intro-copy">
         心中默念所问之事，摇动三枚铜钱，凡六次而成一卦。老阳老阴为动爻，动则生变卦。
         「初筮告，再三渎」——同一日同一事，只取初卦。
@@ -419,12 +419,12 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="card">
-        <div class="card-title">卦辞</div>
+        <h2 class="card-title">卦辞</h2>
         <p class="scripture primary-scripture">{{ result.primary.scripture }}</p>
       </div>
 
       <div v-if="result.movingTexts.length" class="card">
-        <div class="card-title">动爻爻辞</div>
+        <h2 class="card-title">动爻爻辞</h2>
         <div v-for="text in result.movingTexts" :key="text.name" class="kv">
           <span class="k moving-name">{{ text.name }}</span>
           <span class="scripture">{{ text.scripture }}</span>
@@ -432,13 +432,14 @@ onBeforeUnmount(() => {
       </div>
 
       <div v-if="result.changed" class="card">
-        <div class="card-title">变卦卦辞 · {{ result.changedName }}</div>
+        <h2 class="card-title">变卦卦辞 · {{ result.changedName }}</h2>
         <p class="scripture">{{ result.changed.scripture }}</p>
       </div>
 
       <div class="card">
         <button class="btn block" @click="askAi">AI 解卦</button>
         <p class="muted small storage-note">卦象已记入今日卦簿，同日重问同事不再重摇。</p>
+        <p class="card-footnote muted small">动爻取本卦变爻爻辞；无动爻时以本卦卦辞为主。卦爻辞引自《周易》公版原文。</p>
         <p v-if="storageWarning" class="storage-warning" role="status">{{ storageWarning }}</p>
       </div>
     </template>

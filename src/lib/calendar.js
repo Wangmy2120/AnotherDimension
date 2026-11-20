@@ -1,5 +1,14 @@
 import { Solar, Lunar, LunarUtil } from 'lunar-typescript'
 
+const ZODIAC = {
+  子: '鼠', 丑: '牛', 寅: '虎', 卯: '兔', 辰: '龙', 巳: '蛇',
+  午: '马', 未: '羊', 申: '猴', 酉: '鸡', 戌: '狗', 亥: '猪'
+}
+
+function zodiacFromGanZhi(ganZhi) {
+  return ZODIAC[ganZhi?.[1]] || ''
+}
+
 export function todayStr() {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -18,11 +27,13 @@ export function getDayInfo(dateStr) {
     week: '日一二三四五六'[solar.getWeek()],
     lunarText: `${lunar.getYearInChinese()}年${lunar.getMonthInChinese()}月${lunar.getDayInChinese()}`,
     yearGanZhi: lunar.getYearInGanZhi(),
+    yearGanZhiLiChun: lunar.getYearInGanZhiByLiChun(),
     monthGanZhi: lunar.getMonthInGanZhi(),
     dayGanZhi: lunar.getDayInGanZhi(),
     dayGan: lunar.getDayGan(),
     dayZhi: lunar.getDayZhi(),
-    shengXiao: lunar.getYearShengXiao(),
+    shengXiao: lunar.getYearShengXiaoByLiChun(),
+    shengXiaoBasis: '立春',
     yi: lunar.getDayYi(),
     ji: lunar.getDayJi(),
     chong: lunar.getDayChongDesc(),
@@ -37,6 +48,14 @@ export function getDayInfo(dateStr) {
     xiuName: `${lunar.getXiu()}宿`,
     xiuLuck: lunar.getXiuLuck(),
     xiuSong: lunar.getXiuSong(),
+    zhiXing: lunar.getZhiXing(),
+    taiShen: lunar.getDayPositionTai(),
+    times: lunar.getTimes().map(time => ({
+      ganZhi: time.getGanZhi(),
+      clock: time.getMinHm(),
+      tianShen: time.getTianShen(),
+      luck: time.getTianShenLuck()
+    })),
     prevJie: { name: prevJie.getName(), date: prevJie.getSolar().toYmd() },
     nextJie: { name: nextJie.getName(), date: nextJie.getSolar().toYmd() },
     jieQiToday: lunar.getJieQi(),
@@ -67,6 +86,41 @@ export function getBazi(profile) {
   const wxCount = { 木: 0, 火: 0, 土: 0, 金: 0, 水: 0 }
   for (const p of pillars) for (const c of p.wx) wxCount[c]++
   const dayGan = ec.getDayGan()
+  const shiShen = {
+    year: { gan: ec.getYearShiShenGan(), zhi: ec.getYearShiShenZhi() },
+    month: { gan: ec.getMonthShiShenGan(), zhi: ec.getMonthShiShenZhi() },
+    day: { gan: ec.getDayShiShenGan(), zhi: ec.getDayShiShenZhi() },
+    time: { gan: ec.getTimeShiShenGan(), zhi: ec.getTimeShiShenZhi() }
+  }
+  let yun = null
+  if (profile.gender) {
+    try {
+      const fortune = ec.getYun(profile.gender === 'male' ? 1 : 0)
+      const cycles = fortune.getDaYun()
+      const year = new Date().getFullYear()
+      const current = cycles.find(item => item.getStartYear() <= year && item.getEndYear() >= year)
+      yun = {
+        start: `${fortune.getStartYear()}年${fortune.getStartMonth()}个月起运`,
+        cycles: cycles.slice(1, 9).map(item => ({
+          ganZhi: item.getGanZhi(),
+          start: item.getStartYear(),
+          end: item.getEndYear(),
+          age: item.getStartAge(),
+          current: item === current
+        })),
+        currentGanZhi: current?.getGanZhi() || '',
+        liuNian: current
+          ? current.getLiuNian()
+              .map(item => ({
+                year: item.getYear(),
+                age: item.getAge(),
+                ganZhi: item.getGanZhi(),
+                current: item.getYear() === year
+              }))
+          : []
+      }
+    } catch { /* 性别与节令边界不满足时，不展示大运 */ }
+  }
   return {
     lunar,
     solar: lunar.getSolar(),
@@ -74,13 +128,15 @@ export function getBazi(profile) {
     wxCount,
     dayGan,
     dayMasterWuXing: LunarUtil.WU_XING_GAN[dayGan],
-    shengXiao: lunar.getYearShengXiao(),
+    shengXiao: zodiacFromGanZhi(ec.getYear()),
     taiYuan: ec.getTaiYuan(),
     mingGong: ec.getMingGong(),
     shenGong: ec.getShenGong(),
     xunKong: ec.getDayXunKong(),
     lunarText: `${lunar.getMonthInChinese()}月${lunar.getDayInChinese()}`,
-    missingWuXing: Object.keys(wxCount).filter(k => wxCount[k] === 0)
+    missingWuXing: Object.keys(wxCount).filter(k => wxCount[k] === 0),
+    shiShen,
+    yun
   }
 }
 

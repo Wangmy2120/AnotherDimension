@@ -5,12 +5,12 @@ import { getBazi } from '../lib/calendar.js'
 
 const form = reactive({
   calendar: store.profile?.calendar || 'solar',
-  solarDate: '1995-01-01',
-  lunarYear: 1995,
-  lunarMonth: 1,
-  lunarDay: 1,
+  solarDate: '',
+  lunarYear: '',
+  lunarMonth: '',
+  lunarDay: '',
   leap: false,
-  time: '12:00',
+  time: '',
   gender: ''
 })
 function syncForm(p) {
@@ -35,11 +35,16 @@ const chart = computed(() => bazi())
 
 function submit() {
   error.value = ''
+  if (!form.time) {
+    error.value = '请填写出生时间'
+    return
+  }
   const [hour, minute] = form.time.split(':').map(Number)
   let candidate
   if (form.calendar === 'solar') {
     const [year, month, day] = form.solarDate.split('-').map(Number)
     if (!year || !month || !day) { error.value = '请填写完整的出生日期'; return }
+    if (year < 1901 || year > 2099) { error.value = '出生日期超出支持范围（1901—2099）'; return }
     candidate = { calendar: 'solar', year, month, day, hour, minute, gender: form.gender }
   } else {
     const { lunarYear: year, lunarMonth: month, lunarDay: day, leap } = form
@@ -62,7 +67,9 @@ function clearProfile() {
 }
 
 const SHICHEN = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥']
+const PILLAR_KEYS = ['year', 'month', 'day', 'time']
 function shichen(h) {
+  if (!Number.isFinite(h)) return '待录入'
   return SHICHEN[Math.floor(((h + 1) % 24) / 2)] + '时'
 }
 </script>
@@ -70,13 +77,13 @@ function shichen(h) {
 <template>
   <div class="bazi-view">
     <div class="card birth-card">
-      <div class="card-title">录入生辰</div>
+      <h2 class="card-title">录入生辰</h2>
       <div class="row" style="margin-bottom: 12px">
         <label class="row"><input type="radio" value="solar" v-model="form.calendar"> 公历</label>
         <label class="row"><input type="radio" value="lunar" v-model="form.calendar"> 农历</label>
       </div>
       <div v-if="form.calendar === 'solar'" class="row" style="margin-bottom: 12px">
-        <input type="date" v-model="form.solarDate" min="1901-01-01" max="2099-12-31">
+        <input type="date" v-model="form.solarDate" min="1901-01-01" max="2099-12-31" aria-label="出生日期">
       </div>
       <div v-else class="row" style="margin-bottom: 12px">
         <input type="number" v-model.number="form.lunarYear" min="1901" max="2099" style="width: 90px"> 年
@@ -85,7 +92,7 @@ function shichen(h) {
         <label class="row small"><input type="checkbox" v-model="form.leap"> 闰月</label>
       </div>
       <div class="row" style="margin-bottom: 12px">
-        <input type="time" v-model="form.time">
+        <input type="time" v-model="form.time" aria-label="出生时间">
         <span class="muted small">{{ shichen(Number(form.time.split(':')[0])) }}</span>
         <select v-model="form.gender">
           <option value="">性别（可选）</option>
@@ -103,7 +110,7 @@ function shichen(h) {
 
     <template v-if="chart">
       <div class="card">
-        <div class="card-title">四柱八字</div>
+        <h2 class="card-title">四柱八字</h2>
         <div class="pillar-grid" aria-label="四柱八字">
           <article
             v-for="(p, index) in chart.pillars"
@@ -115,6 +122,7 @@ function shichen(h) {
             <div class="pillar-gz">{{ p.gz }}</div>
             <div class="pillar-wx">{{ p.wx }}</div>
             <div class="pillar-ny">{{ p.ny }}</div>
+            <div class="pillar-ss"><span>十神</span>{{ chart.shiShen[PILLAR_KEYS[index]].gan }}</div>
           </article>
         </div>
         <div class="chart-details">
@@ -123,10 +131,11 @@ function shichen(h) {
           <div class="kv"><span class="k">胎元/命宫</span><span>{{ chart.taiYuan }} / {{ chart.mingGong }}（身宫 {{ chart.shenGong }}）</span></div>
           <div class="kv"><span class="k">日柱旬空</span><span>{{ chart.xunKong }}</span></div>
         </div>
+        <p class="card-footnote muted small">十神、四柱与命宫参《渊海子平》体例；排盘由 lunar-typescript 推算。</p>
       </div>
 
       <div class="card">
-        <div class="card-title">五行分布</div>
+        <h2 class="card-title">五行分布</h2>
         <div
           v-for="(n, wx, index) in chart.wxCount"
           :key="wx"
@@ -155,6 +164,30 @@ function shichen(h) {
         <p class="muted small" style="margin-top: 10px">
           {{ chart.missingWuXing.length ? '八字五行缺：' + chart.missingWuXing.join('、') + '。民俗认为可通过方位、颜色等日常偏好调和，仅供趣谈。' : '五行俱全，气机周流。' }}
         </p>
+      </div>
+
+      <div v-if="chart.yun" class="card">
+        <h2 class="card-title">大运与流年</h2>
+        <p class="muted small yun-start">{{ chart.yun.start }} · 参《渊海子平》大运法</p>
+        <div class="dayun-rail" aria-label="大运">
+          <div v-for="cycle in chart.yun.cycles" :key="cycle.ganZhi" class="dayun-node" :class="{ 'is-current': cycle.current }">
+            <span class="dayun-gz">{{ cycle.ganZhi }}</span>
+            <span>{{ cycle.start }}—{{ cycle.end }}</span>
+            <small>{{ cycle.age }} 岁起</small>
+          </div>
+        </div>
+        <div v-if="chart.yun.liuNian.length" class="liunian-row" aria-label="当前大运流年">
+          <div v-for="year in chart.yun.liuNian" :key="year.year" :class="{ 'is-current': year.current }">
+            <strong>{{ year.ganZhi }}</strong>
+            <span>{{ year.year }} · {{ year.age }}岁</span>
+          </div>
+        </div>
+        <p class="card-footnote muted small">大运与流年为传统命理展示，不构成人生决策建议。</p>
+      </div>
+      <div v-else class="card">
+        <h2 class="card-title">大运与流年</h2>
+        <p class="muted small">出生资料补充“性别”后，可展示大运、流年与十神推演。</p>
+        <p class="card-footnote muted small">大运法参《渊海子平》；性别不同，行运顺逆亦不同。</p>
       </div>
     </template>
   </div>
@@ -226,6 +259,89 @@ function shichen(h) {
 .pillar-ny {
   margin-top: 4px;
   color: var(--muted);
+}
+
+.pillar-ss {
+  margin-top: 8px;
+  color: var(--silver);
+  font-size: 12px;
+}
+
+.pillar-ss span {
+  margin-right: 5px;
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+
+.yun-start {
+  margin-bottom: 14px;
+}
+
+.dayun-rail {
+  display: flex;
+  padding-bottom: 8px;
+  gap: 8px;
+  overflow-x: auto;
+}
+
+.dayun-node {
+  display: flex;
+  min-width: 104px;
+  padding: 12px;
+  flex: 0 0 104px;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid var(--line);
+  color: var(--silver);
+  font-size: 12px;
+}
+
+.dayun-node.is-current {
+  border-color: var(--line-strong);
+  background: oklch(0.97 0 0 / 0.05);
+}
+
+.dayun-node small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.dayun-gz {
+  color: var(--glow);
+  font-family: 'Noto Serif SC', 'Songti SC', serif;
+  font-size: 22px;
+  letter-spacing: 0.08em;
+}
+
+.liunian-row {
+  display: grid;
+  margin-top: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+  gap: 8px;
+}
+
+.liunian-row > div {
+  display: flex;
+  padding: 10px;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.liunian-row > div.is-current {
+  border-color: var(--line-strong);
+  background: oklch(0.97 0 0 / 0.055);
+  color: var(--silver);
+}
+
+.liunian-row strong {
+  color: var(--glow);
+  font-family: 'Noto Serif SC', 'Songti SC', serif;
+  font-size: 18px;
+  font-weight: 400;
 }
 
 .chart-details {
@@ -347,6 +463,8 @@ function shichen(h) {
     font-size: 22px;
   }
 }
+
+.bazi-view label.row { min-height: 44px; }
 
 @media (prefers-reduced-motion: reduce) {
   .pillar-card,

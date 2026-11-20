@@ -5,56 +5,138 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { store, dayInfo, bazi, fortune } from './store.js'
 import { subscribeMotion } from './lib/motion.js'
 import { sound } from './lib/sound.js'
+import { chapterByKey, chapterFromHash, chapters, readingChapters } from './data/chapters.js'
 import HomeView from './views/HomeView.vue'
+import SynthesisView from './views/SynthesisView.vue'
 import CelestialLoader from './components/CelestialLoader.vue'
 import AiPanel from './components/AiPanel.vue'
 import InkField from './components/InkField.vue'
 import NextChapter from './components/NextChapter.vue'
 
-const tabs = [
-  { key: 'home', label: '今日', code: 'ORIGIN', comp: HomeView },
-  { key: 'almanac', label: '黄历', code: 'ALMANAC', loader: () => import('./views/AlmanacView.vue') },
-  { key: 'zeji', label: '择吉', code: 'SELECTION', loader: () => import('./views/ZejiView.vue') },
-  { key: 'fortune', label: '运势', code: 'FORTUNE', loader: () => import('./views/FortuneView.vue') },
-  { key: 'bazi', label: '八字', code: 'NATAL CHART', loader: () => import('./views/BaziView.vue') },
-  { key: 'gua', label: '摇卦', code: 'DIVINATION', loader: () => import('./views/DivinationView.vue') },
-  { key: 'dream', label: '解梦', code: 'ONEIRIC', loader: () => import('./views/DreamView.vue') },
-  { key: 'settings', label: '设置', code: 'CALIBRATION', loader: () => import('./views/SettingsView.vue') }
-]
+const loaders = {
+  home: () => Promise.resolve({ default: HomeView }),
+  almanac: () => import('./views/AlmanacView.vue'),
+  zeji: () => import('./views/ZejiView.vue'),
+  fortune: () => import('./views/FortuneView.vue'),
+  bazi: () => import('./views/BaziView.vue'),
+  gua: () => import('./views/DivinationView.vue'),
+  dream: () => import('./views/DreamView.vue'),
+  synthesis: () => Promise.resolve({ default: SynthesisView }),
+  settings: () => import('./views/SettingsView.vue')
+}
 
-const active = ref('home')
-const requestedKey = ref('home')
-const current = shallowRef(HomeView)
+const componentCache = new Map([
+  ['home', HomeView],
+  ['synthesis', SynthesisView]
+])
+const loadingPromises = new Map()
+const initialChapter = chapterFromHash(window.location.hash)
+const active = ref(initialChapter.key)
+const requestedKey = ref(initialChapter.key)
+const current = shallowRef(componentCache.get(initialChapter.key) || null)
 const showLoader = ref(true)
 const viewReady = ref(false)
+const viewPending = ref(false)
 const loadError = ref('')
 const requestSequence = ref(0)
 const indexOpen = ref(false)
 const indexPanel = ref(null)
 const indexTrigger = ref(null)
-const quickNav = ref(null)
-const activeTab = computed(() => tabs.find(tab => tab.key === active.value) || tabs[0])
-const activeIndex = computed(() => tabs.findIndex(tab => tab.key === active.value))
+const activeTab = computed(() => chapterByKey[active.value] || chapterByKey.home)
 const info = computed(() => dayInfo())
 const chart = computed(() => bazi())
 const todayFortune = computed(() => fortune())
-const indexItems = computed(() => {
-  const metadata = {
-    home: `${info.value.dayGanZhi}日 · ${info.value.lunarText}`,
-    almanac: `${info.value.xiuName}宿 · ${info.value.xiuLuck}`,
-    zeji: `${info.value.dateStr} · 冲${info.value.chong}`,
-    fortune: `综合 ${todayFortune.value.overall} / 100`,
-    bazi: chart.value ? `${chart.value.dayGan}日主 · ${chart.value.shengXiao}` : '等待录入生辰',
-    gua: store.hexSession?.result?.primaryName || '尚未起卦',
-    dream: store.dreamSession?.keyword || '尚未记录',
-    settings: store.settings?.apiKey ? '模型已配置' : '模型待配置'
+const readingIndex = computed(() => readingChapters.findIndex(chapter => chapter.key === active.value))
+const prevChapter = computed(() => readingIndex.value > 0 ? readingChapters[readingIndex.value - 1] : null)
+const nextChapter = computed(() => readingIndex.value >= 0 ? readingChapters[readingIndex.value + 1] || null : null)
+
+const chapterMeta = computed(() => ({
+  home: `${info.value.dayGanZhi}日 · ${info.value.lunarText}`,
+  almanac: `宜${info.value.yi[0] || '静'} · 忌${info.value.ji[0] || '躁'}`,
+  zeji: `${info.value.dateStr} · ${info.value.chongLabel}`,
+  fortune: `综合 ${todayFortune.value.overall} / 100`,
+  bazi: chart.value ? `${chart.value.dayGan}日主 · ${chart.value.shengXiao}` : '等待录入生辰',
+  gua: store.hexSession?.result?.primaryName || '尚未起卦',
+  dream: store.dreamSession?.keyword || '尚未记录',
+  synthesis: '历法 · 命盘 · 卦象 · 梦境',
+  settings: '隐私 · 数据 · 声音'
+}))
+
+const indexItems = computed(() => chapters.map(chapter => ({
+  ...chapter,
+  meta: chapterMeta.value[chapter.key]
+})))
+
+const activeFacts = computed(() => {
+  switch (active.value) {
+    case 'almanac':
+      return [
+        { label: '日期', value: info.value.dateStr },
+        { label: '干支', value: `${info.value.dayGanZhi}日` },
+        { label: '值宿', value: `${info.value.xiuName} · ${info.value.xiuLuck}` }
+      ]
+    case 'zeji':
+      return [
+        { label: '今日', value: info.value.dateStr },
+        { label: '冲煞', value: info.value.chongLabel }
+      ]
+    case 'fortune':
+      return [
+        { label: '日期', value: info.value.dateStr },
+        { label: '综合', value: `${todayFortune.value.overall} / 100` },
+        { label: '关系', value: todayFortune.value.relation || '通用' }
+      ]
+    case 'bazi':
+      return chart.value
+        ? [
+            { label: '日主', value: `${chart.value.dayGan} · ${chart.value.dayMasterWuXing}` },
+            { label: '生肖', value: chart.value.shengXiao },
+            { label: '四柱', value: chart.value.pillars.map(item => item.gz).join(' ') }
+          ]
+        : [
+            { label: '生辰', value: '待录入' },
+            { label: '资料', value: '仅保存在此浏览器' }
+          ]
+    case 'gua':
+      return store.hexSession
+        ? [
+            { label: '本卦', value: store.hexSession.result.primaryName },
+            { label: '变卦', value: store.hexSession.result.changedName || '六爻安静' }
+          ]
+        : [
+            { label: '卦象', value: '尚未起卦' },
+            { label: '仪式', value: '三钱六爻' }
+          ]
+    case 'dream':
+      return store.dreamSession
+        ? [
+            { label: '关键词', value: store.dreamSession.keyword },
+            { label: '传统吉凶', value: store.dreamSession.luck || '已记录' }
+          ]
+        : [
+            { label: '梦境', value: '尚未记录' },
+            { label: '记录', value: '仅保存在此浏览器' }
+          ]
+    case 'synthesis':
+      return [
+        { label: '日期', value: info.value.dateStr },
+        { label: '资料范围', value: '历法 · 命盘 · 卦象 · 梦境' }
+      ]
+    case 'settings':
+      return [
+        { label: '存储', value: '浏览器本地' },
+        { label: '动效', value: reducedMotion() ? '已减少动态' : '完整动态' }
+      ]
+    default:
+      return []
   }
-  return tabs.map((tab, index) => ({ ...tab, number: String(index + 1).padStart(2, '0'), metadata: metadata[tab.key] }))
 })
 
-let loaderDelay
+const activeCode = computed(() => activeTab.value.number ? `${activeTab.value.number} / ${activeTab.value.code}` : activeTab.value.code)
+
 let errorTimer
 let initialReadyTimer
+let prefetchTimer
 let homeScroll = 0
 let pendingScroll = 0
 let lenis
@@ -77,48 +159,99 @@ function scrollTo(top, immediate = false) {
   }
 }
 
-async function switchTab(t) {
-  if (requestedKey.value === t.key) {
-    if (t.key === 'home') scrollTo(0)
-    return
+function documentTitle(chapter) {
+  return chapter.key === 'home' ? '天机历 · 观天象，定此刻' : `${chapter.label} · 天机历`
+}
+
+async function ensureChapter(key) {
+  if (componentCache.has(key)) return componentCache.get(key)
+  if (!loaders[key]) throw new Error(`Unknown chapter: ${key}`)
+  if (!loadingPromises.has(key)) {
+    const promise = loaders[key]().then(module => {
+      componentCache.set(key, module.default)
+      return module.default
+    }).finally(() => loadingPromises.delete(key))
+    loadingPromises.set(key, promise)
   }
-  requestedKey.value = t.key
+  return loadingPromises.get(key)
+}
+
+function markInitialReady() {
+  window.clearTimeout(initialReadyTimer)
+  initialReadyTimer = window.setTimeout(() => { viewReady.value = true }, 280)
+}
+
+function showLoadError(message) {
+  loadError.value = message
+  window.clearTimeout(errorTimer)
+  errorTimer = window.setTimeout(() => { loadError.value = '' }, 5000)
+}
+
+async function activateChapter(chapter, { initial = false, updateHash = true } = {}) {
+  if (!chapter) return false
   const sequence = ++requestSequence.value
-  window.clearTimeout(loaderDelay)
+  requestedKey.value = chapter.key
+  viewPending.value = !componentCache.has(chapter.key)
   window.clearTimeout(errorTimer)
   loadError.value = ''
-  if (active.value === 'home') homeScroll = window.scrollY
+  if (active.value === 'home' && chapter.key !== 'home') homeScroll = window.scrollY
 
-  let currentLoaderDelay
-  if (!t.comp) {
-    viewReady.value = false
-    currentLoaderDelay = window.setTimeout(() => {
-      if (sequence === requestSequence.value) showLoader.value = true
-    }, 160)
-    loaderDelay = currentLoaderDelay
-    try {
-      const module = await t.loader()
-      if (sequence !== requestSequence.value) return
-      t.comp = module.default
-    } catch {
-      if (sequence === requestSequence.value) {
-        requestedKey.value = active.value
-        loadError.value = `${t.label}页面加载失败，请再次点击标签重试。`
-        viewReady.value = true
-        errorTimer = window.setTimeout(() => { loadError.value = '' }, 5000)
-      }
-      return
-    } finally {
-      window.clearTimeout(currentLoaderDelay)
+  let component
+  try {
+    component = await ensureChapter(chapter.key)
+  } catch {
+    viewPending.value = false
+    if (initial) {
+      active.value = 'home'
+      requestedKey.value = 'home'
+      current.value = HomeView
+      history.replaceState(null, '', '#/')
+      document.title = documentTitle(chapterByKey.home)
+      markInitialReady()
+    } else {
+      requestedKey.value = active.value
+      history.replaceState(null, '', activeTab.value.path)
+      showLoadError(`${chapter.label}页面加载失败，请稍后再试。`)
     }
+    return false
   }
 
-  if (sequence !== requestSequence.value) return
-  active.value = t.key
-  pendingScroll = t.key === 'home' ? homeScroll : 0
-  current.value = t.comp
+  if (sequence !== requestSequence.value) return false
+  viewPending.value = false
+  active.value = chapter.key
+  pendingScroll = chapter.key === 'home' ? homeScroll : 0
+  current.value = component
+  document.title = documentTitle(chapter)
+  if (updateHash && window.location.hash !== chapter.path) {
+    history.pushState(null, '', chapter.path)
+  }
   await nextTick()
-  if (showLoader.value) viewReady.value = true
+  if (initial) markInitialReady()
+  return true
+}
+
+function navigateTo(key) {
+  const chapter = chapterByKey[key]
+  if (!chapter) return
+  if (window.location.hash === chapter.path) {
+    if (chapter.key === active.value) {
+      if (chapter.key === 'home') scrollTo(0)
+      return
+    }
+    activateChapter(chapter, { updateHash: false })
+    return
+  }
+  window.location.hash = chapter.path
+}
+
+function handleHashChange() {
+  if (window.location.hash && !window.location.hash.startsWith('#/')) return
+  const chapter = chapterFromHash(window.location.hash)
+  if (window.location.hash !== chapter.path) {
+    history.replaceState(null, '', chapter.path)
+  }
+  if (chapter.key === active.value && current.value) return
+  activateChapter(chapter, { updateHash: false })
 }
 
 function restoreScroll() {
@@ -128,7 +261,19 @@ function restoreScroll() {
 
 function finishLoading() {
   showLoader.value = false
-  viewReady.value = false
+  window.clearTimeout(prefetchTimer)
+  prefetchTimer = window.setTimeout(preloadChapters, 700)
+}
+
+function preloadChapters() {
+  const run = () => {
+    for (const chapter of chapters) {
+      if (componentCache.has(chapter.key)) continue
+      ensureChapter(chapter.key).catch(() => {})
+    }
+  }
+  if ('requestIdleCallback' in window) requestIdleCallback(run, { timeout: 2500 })
+  else run()
 }
 
 function openIndex() {
@@ -147,11 +292,6 @@ function closeIndex(restoreFocus = true) {
   if (!reducedMotion() && !window.matchMedia('(pointer: coarse)').matches) lenis?.start()
   sound.sweep()
   if (restoreFocus) nextTick(() => (returnFocus || indexTrigger.value)?.focus())
-}
-
-function selectTab(tab) {
-  closeIndex(false)
-  switchTab(tab)
 }
 
 function handleIndexKeys(event) {
@@ -177,7 +317,7 @@ function handleIndexKeys(event) {
 
 function setupLenis() {
   if (lenis || reducedMotion() || window.matchMedia('(pointer: coarse)').matches) return
-  lenis = new Lenis({ autoRaf: false, lerp: 0.09, smoothWheel: true, syncTouch: false, anchors: true })
+  lenis = new Lenis({ autoRaf: false, lerp: 0.09, smoothWheel: true, syncTouch: false, anchors: false })
   lenis.on('scroll', ScrollTrigger.update)
   unsubscribeLenis = subscribeMotion(time => lenis?.raf(time))
   ScrollTrigger.refresh()
@@ -250,19 +390,19 @@ function handleMagneticLeave(event) {
 
 watch(() => store.tabRequest, key => {
   if (!key) return
-  const tab = tabs.find(item => item.key === key)
-  if (tab) switchTab(tab)
+  navigateTo(key)
   store.tabRequest = null
 })
 
-watch(active, async () => {
-  await nextTick()
-  const nav = quickNav.value
-  const currentButton = nav?.querySelector('[aria-current="page"]')
-  if (nav && currentButton) nav.scrollLeft = currentButton.offsetLeft - nav.clientWidth / 2 + currentButton.clientWidth / 2
+watch(() => store.aiOpen, open => {
+  if (open) {
+    lenis?.stop()
+  } else if (!indexOpen.value && !reducedMotion() && !window.matchMedia('(pointer: coarse)').matches) {
+    lenis?.start()
+  }
 })
 
-onMounted(() => {
+onMounted(async () => {
   motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
   motionQuery.addEventListener('change', handleMotionPreference)
   setupLenis()
@@ -271,18 +411,30 @@ onMounted(() => {
   window.addEventListener('scroll', handleScrollState, { passive: true })
   window.addEventListener('pointermove', handleMagneticMove, { passive: true })
   window.addEventListener('pointerout', handleMagneticLeave, { passive: true })
-  initialReadyTimer = window.setTimeout(() => { viewReady.value = true }, 320)
+  window.addEventListener('hashchange', handleHashChange)
+
+  if (window.location.hash !== initialChapter.path) {
+    history.replaceState(null, '', initialChapter.path)
+  }
+  document.title = documentTitle(initialChapter)
+  if (initialChapter.key === 'home') {
+    await nextTick()
+    markInitialReady()
+  } else {
+    await activateChapter(initialChapter, { initial: true, updateHash: false })
+  }
 })
 
 onBeforeUnmount(() => {
-  window.clearTimeout(loaderDelay)
   window.clearTimeout(errorTimer)
   window.clearTimeout(initialReadyTimer)
+  window.clearTimeout(prefetchTimer)
   window.clearTimeout(scrollStateTimer)
   window.removeEventListener('keydown', handleIndexKeys)
   window.removeEventListener('scroll', handleScrollState)
   window.removeEventListener('pointermove', handleMagneticMove)
   window.removeEventListener('pointerout', handleMagneticLeave)
+  window.removeEventListener('hashchange', handleHashChange)
   motionQuery?.removeEventListener('change', handleMotionPreference)
   cardObserver?.disconnect()
   cardMutation?.disconnect()
@@ -292,13 +444,14 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="app" :class="{ 'is-home': active === 'home', 'has-index': indexOpen }">
+  <div class="app" :class="{ 'is-home': active === 'home', 'is-synthesis': active === 'synthesis', 'has-index': indexOpen }">
+    <a class="skip-link" href="#main-content">跳到主要内容</a>
     <InkField :home="active === 'home'" :index-open="indexOpen" />
-    <CelestialLoader v-if="showLoader" :key="requestSequence" :ready="viewReady" @finished="finishLoading" />
+    <CelestialLoader v-if="showLoader" :ready="viewReady" @finished="finishLoading" />
 
     <header class="app-header">
       <div class="header-inner">
-        <button class="brand" type="button" aria-label="返回今日首页" @click="switchTab(tabs[0])">
+        <a class="brand" href="#/" aria-label="返回今日首页">
           <svg class="brand-mark" viewBox="0 0 64 64" aria-hidden="true">
             <circle cx="32" cy="32" r="29" fill="currentColor" />
             <path d="M32 3 A29 29 0 0 1 32 61 A14.5 14.5 0 0 1 32 32 A14.5 14.5 0 0 0 32 3" fill="var(--void)" />
@@ -306,71 +459,80 @@ onBeforeUnmount(() => {
             <circle cx="32" cy="46.5" r="4" fill="var(--void)" />
           </svg>
           <span class="brand-copy"><span class="app-title">天机历</span><span class="app-sub">TIANJI CALENDAR</span></span>
-        </button>
+        </a>
         <div class="hud-actions">
           <button class="hud-button sound-toggle" type="button" :aria-pressed="sound.enabled" :aria-label="sound.enabled ? '关闭交互声音' : '开启交互声音'" @click="sound.toggle()">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4h4l5 4V6L8 10H4Z" /><path v-if="sound.enabled" d="M16 9c1.7 1.7 1.7 4.3 0 6M18.5 6.5c3 3 3 8 0 11" /><path v-else d="m16 9 5 6m0-6-5 6" /></svg>
-            <span>声音 {{ sound.enabled ? '开' : '关' }}</span>
+            <span>声音 {{ sound.enabled ? '开' : '关' }} <em class="hud-en">SOUND</em></span>
           </button>
+          <a class="hud-button conclusion-trigger" href="#/synthesis" aria-label="前往合参">
+            <span>合参 <em class="hud-en">SYNTH</em></span>
+          </a>
           <button ref="indexTrigger" class="hud-button index-trigger" type="button" aria-haspopup="dialog" :aria-expanded="indexOpen" @click="indexOpen ? closeIndex() : openIndex()">
-            <span>索引</span><i aria-hidden="true"></i><i aria-hidden="true"></i>
+            <span>索引 <em class="hud-en">INDEX</em></span><i aria-hidden="true"></i><i aria-hidden="true"></i>
           </button>
         </div>
       </div>
-      <nav v-if="active !== 'home'" ref="quickNav" class="quick-nav" aria-label="快速切换功能">
-        <button v-for="tab in tabs" :key="tab.key" type="button" :class="{ active: active === tab.key }" :aria-current="active === tab.key ? 'page' : undefined" @click="switchTab(tab)">{{ tab.label }}</button>
-      </nav>
     </header>
 
-    <main :aria-busy="showLoader">
-      <div class="view-shell" :class="{ 'is-home': active === 'home' }">
-        <section v-if="active !== 'home'" class="case-intro" :aria-labelledby="`page-${active}`">
+    <main id="main-content" :aria-busy="showLoader || viewPending">
+      <div class="view-shell" :class="{ 'is-home': active === 'home', 'is-synthesis': active === 'synthesis' }">
+        <section v-if="active !== 'home' && activeTab.intro" class="case-intro" :aria-labelledby="`page-${active}`">
           <div class="case-topline">
-            <button class="back-home" type="button" @click="switchTab(tabs[0])">
+            <a class="back-home" href="#/">
               <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M16 10H4M9 5l-5 5 5 5" /></svg>
-              <span>返回首页</span>
-            </button>
-            <p class="case-code">{{ String(activeIndex + 1).padStart(2, '0') }} / {{ activeTab.code }}</p>
+              <span>返回今日</span>
+            </a>
+            <div class="chapter-pager" aria-label="章节切换">
+              <a v-if="prevChapter" class="chapter-step" :href="prevChapter.path">← {{ prevChapter.label }}</a>
+              <button class="chapter-step" type="button" @click="openIndex">章节索引</button>
+              <a v-if="nextChapter" class="chapter-step" :href="nextChapter.path">{{ nextChapter.label }} →</a>
+            </div>
+            <p class="case-code">{{ activeCode }}</p>
           </div>
-          <h1 :id="`page-${active}`">{{ activeTab.label }}</h1>
+          <p class="case-kicker">{{ activeTab.label }} / {{ activeTab.code }}</p>
+          <h1 :id="`page-${active}`">{{ activeTab.title }}</h1>
           <dl class="case-meta">
-            <div><dt>日期</dt><dd>{{ info.dateStr }}</dd></div>
-            <div><dt>干支</dt><dd>{{ info.dayGanZhi }}日</dd></div>
-            <div><dt>值宿</dt><dd>{{ info.xiuName }} · {{ info.xiuLuck }}</dd></div>
-            <div><dt>状态</dt><dd>{{ indexItems[activeIndex]?.metadata }}</dd></div>
+            <div v-for="fact in activeFacts" :key="fact.label">
+              <dt>{{ fact.label }}</dt>
+              <dd>{{ fact.value }}</dd>
+            </div>
           </dl>
         </section>
         <Transition name="view" mode="out-in" @after-enter="restoreScroll">
-          <KeepAlive><component :is="current" :key="active" /></KeepAlive>
+          <KeepAlive>
+            <component v-if="current" :is="current" :key="active" />
+          </KeepAlive>
         </Transition>
-        <NextChapter v-if="active !== 'home'" :current="active" :tabs="tabs" />
+        <NextChapter v-if="activeTab.group === 'chapter'" :current="active" :items="readingChapters" />
       </div>
     </main>
 
     <Transition name="index-menu">
       <div v-if="indexOpen" class="index-mask" @click.self="closeIndex()">
-        <section ref="indexPanel" class="index-panel" role="dialog" aria-modal="true" aria-label="全站功能索引">
+        <section ref="indexPanel" class="index-panel" role="dialog" aria-modal="true" aria-label="全站章节索引">
           <header class="index-head"><span>TIANJI / INDEX</span><button type="button" aria-label="关闭索引" @click="closeIndex()">关闭 ×</button></header>
           <div class="index-word" aria-hidden="true">INDEX</div>
-          <nav class="index-list" aria-label="全部八项功能">
-            <button v-for="(item, index) in indexItems" :key="item.key" class="index-link" :class="{ active: active === item.key }" :style="{ '--i': index }" type="button" :aria-current="active === item.key ? 'page' : undefined" @click="selectTab(item)">
-              <span class="index-number">{{ item.number }}</span>
+          <nav class="index-list" aria-label="全部章节与偏好">
+            <a v-for="(item, index) in indexItems" :key="item.key" class="index-link" :class="{ active: active === item.key }" :style="{ '--i': index }" :href="item.path" :aria-current="active === item.key ? 'page' : undefined" @click="closeIndex(false)">
+              <span class="index-number">{{ item.number || '—' }}</span>
               <strong>{{ item.label }}</strong>
-              <span class="index-meta">{{ item.metadata }}</span>
+              <span class="index-meta">{{ item.meta }}</span>
               <span class="index-arrow" aria-hidden="true">↗</span>
-            </button>
+            </a>
           </nav>
           <footer class="index-foot">ESC 关闭 · 观时 · 知位 · 见天地</footer>
         </section>
       </div>
     </Transition>
 
+    <div v-if="viewPending" class="route-pending" role="status">正在载入章节…</div>
     <div v-if="loadError" class="view-load-error" role="alert">{{ loadError }}</div>
     <footer class="footer-note">
       <div class="footer-brand-row">
         <span class="footer-brand">天机历</span>
         <div class="footer-actions">
-          <button v-if="active !== 'home'" class="back-top footer-home" type="button" @click="switchTab(tabs[0])">返回首页 <span aria-hidden="true">↖</span></button>
+          <a v-if="active !== 'home'" class="back-top footer-home" href="#/">返回今日 <span aria-hidden="true">↖</span></a>
           <button class="back-top" type="button" @click="scrollTo(0)">回到顶部 <span aria-hidden="true">↑</span></button>
         </div>
       </div>

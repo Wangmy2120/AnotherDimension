@@ -10,18 +10,9 @@ const info = computed(() => dayInfo())
   <div class="almanac-view">
     <DateBar />
 
-    <section class="card calendar-card" aria-labelledby="calendar-title">
-      <div id="calendar-title" class="card-title">历法干支</div>
-      <div class="kv"><span class="k">公历</span><span>{{ info.dateStr }} 星期{{ info.week }}</span></div>
-      <div class="kv"><span class="k">农历</span><span>{{ info.lunarText }}（{{ info.shengXiao }}年）</span></div>
-      <div class="kv"><span class="k">干支</span><span>{{ info.yearGanZhi }}年 {{ info.monthGanZhi }}月 {{ info.dayGanZhi }}日</span></div>
-      <div class="kv"><span class="k">节气</span><span>{{ info.prevJie.name }}（{{ info.prevJie.date }}）→ {{ info.nextJie.name }}（{{ info.nextJie.date }}）</span></div>
-      <div class="kv"><span class="k">彭祖百忌</span><span>{{ info.pengZu.join('；') }}</span></div>
-    </section>
-
     <section class="card tag-card" aria-labelledby="yi-title">
       <div class="section-heading">
-        <div id="yi-title" class="card-title">宜</div>
+        <h2 id="yi-title" class="card-title">宜</h2>
         <span class="section-note">顺时而为</span>
       </div>
       <div :key="`yi-${info.dateStr}`" class="tag-list" aria-label="宜做事项">
@@ -36,7 +27,7 @@ const info = computed(() => dayInfo())
 
     <section class="card tag-card" aria-labelledby="ji-title">
       <div class="section-heading">
-        <div id="ji-title" class="card-title">忌</div>
+        <h2 id="ji-title" class="card-title">忌</h2>
         <span class="section-note">知止有度</span>
       </div>
       <div :key="`ji-${info.dateStr}`" class="tag-list" aria-label="忌做事项">
@@ -49,8 +40,33 @@ const info = computed(() => dayInfo())
       </div>
     </section>
 
+    <section class="card calendar-card" aria-labelledby="calendar-title">
+      <h2 id="calendar-title" class="card-title">历法干支</h2>
+      <div class="kv"><span class="k">公历</span><span>{{ info.dateStr }} 星期{{ info.week }}</span></div>
+      <div class="kv"><span class="k">农历</span><span>{{ info.lunarText }} · 生肖（立春）{{ info.shengXiao }}</span></div>
+      <div class="kv"><span class="k">干支</span><span>{{ info.yearGanZhi }}年 {{ info.monthGanZhi }}月 {{ info.dayGanZhi }}日 · 年柱（立春）{{ info.yearGanZhiLiChun }}</span></div>
+      <div class="kv"><span class="k">节气</span><span>{{ info.prevJie.name }}（{{ info.prevJie.date }}）→ {{ info.nextJie.name }}（{{ info.nextJie.date }}）</span></div>
+      <div class="kv"><span class="k">彭祖百忌</span><span>{{ info.pengZu.join('；') }}</span></div>
+    </section>
+
+
+
+
+    <section class="card hours-card" aria-labelledby="hours-title">
+      <h2 id="hours-title" class="card-title">建除 · 胎神 · 时辰</h2>
+      <div class="kv"><span class="k">建除十二神</span><span>{{ info.zhiXing }}日</span></div>
+      <div class="kv"><span class="k">胎神方位</span><span>{{ info.taiShen }}</span></div>
+      <div class="hours-grid" aria-label="十二时辰吉凶">
+        <div v-for="time in info.times" :key="`${time.clock}-${time.ganZhi}`" class="hour-cell" :class="{ 'is-auspicious': time.luck === '吉' }">
+          <span class="hour-name">{{ time.ganZhi }}时 <small>{{ time.clock }}</small></span>
+          <span class="hour-god">{{ time.tianShen }} <b>{{ time.luck }}</b></span>
+        </div>
+      </div>
+      <p class="card-footnote muted small">建除、胎神与时辰宜忌参《协纪辨方书》体例；历法数据由 lunar-typescript 推算。仅供传统文化体验。</p>
+    </section>
+
     <section class="card" aria-labelledby="gods-title">
-      <div id="gods-title" class="card-title">冲煞与吉神</div>
+      <h2 id="gods-title" class="card-title">冲煞与吉神</h2>
       <div class="kv"><span class="k">冲煞</span><span>{{ info.chongLabel }}</span></div>
       <div class="kv"><span class="k">吉神宜趋</span><span>{{ info.jiShen.join('、') || '—' }}</span></div>
       <div class="kv"><span class="k">凶煞宜忌</span><span>{{ info.xiongSha.join('、') || '—' }}</span></div>
@@ -60,7 +76,7 @@ const info = computed(() => dayInfo())
     </section>
 
     <section class="card xiu-card" aria-labelledby="xiu-title">
-      <div id="xiu-title" class="card-title">二十八宿值日</div>
+      <h2 id="xiu-title" class="card-title">二十八宿值日</h2>
       <div class="xiu-layout">
         <div class="xiu-copy">
           <div class="spread">
@@ -125,6 +141,14 @@ const info = computed(() => dayInfo())
 .star { fill: currentColor; opacity: 0.76; }
 .star-major { opacity: 0.96; filter: drop-shadow(0 0 4px oklch(0.96 0 0 / 0.48)); }
 .center-star { fill: currentColor; opacity: 0.42; }
+.hours-grid { display: grid; margin-top: 14px; grid-template-columns: repeat(auto-fit, minmax(108px, 1fr)); gap: 8px; }
+.hour-cell { display: flex; min-height: 58px; padding: 9px 10px; flex-direction: column; gap: 4px; border: 1px solid var(--line); background: oklch(0.97 0 0 / 0.02); }
+.hour-cell.is-auspicious { border-color: var(--line-strong); background: oklch(0.97 0 0 / 0.045); }
+.hour-name { color: var(--silver); font-size: 12px; letter-spacing: 0.04em; }
+.hour-name small { color: var(--muted); font-size: 12px; letter-spacing: 0.02em; }
+.hour-god { color: var(--muted); font-size: 12px; }
+.hour-god b { margin-left: 4px; color: var(--silver); font-weight: 400; }
+.hour-cell.is-auspicious .hour-god b { color: var(--glow); }
 
 @keyframes almanac-tag-in {
   from { opacity: 0; transform: translateY(8px) scale(0.96); }

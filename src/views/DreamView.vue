@@ -78,7 +78,7 @@ function askAi() {
   <div class="dream-view">
     <section class="card dream-hero" aria-labelledby="dream-title">
       <span class="eyebrow">梦有所映 · 心有所答</span>
-      <div id="dream-title" class="card-title">周公解梦</div>
+      <h2 id="dream-title" class="card-title">周公解梦</h2>
       <p class="muted intro">
         梦者，心之影也。输入梦中关键词，查传统民俗释义，亦可请 AI 结合你的近况细细道来。仅供娱乐参考。
       </p>
@@ -120,7 +120,7 @@ function askAi() {
 
     <section v-if="showHot" class="card hot-section" aria-labelledby="hot-title">
       <div class="section-heading">
-        <div id="hot-title" class="card-title">热门梦境</div>
+        <h2 id="hot-title" class="card-title">热门梦境</h2>
         <span class="section-note">精选 8 梦</span>
       </div>
       <div class="hot-grid">
@@ -149,7 +149,7 @@ function askAi() {
 
     <section class="card category-section" aria-labelledby="category-title">
       <div class="section-heading">
-        <div id="category-title" class="card-title">分类浏览</div>
+        <h2 id="category-title" class="card-title">分类浏览</h2>
         <button v-if="showResults" type="button" class="text-button" @click="resetBrowse">返回热门</button>
         <span v-else class="section-note">按意象寻梦</span>
       </div>
@@ -172,7 +172,7 @@ function askAi() {
 
     <section v-if="showResults" class="card search-results" aria-labelledby="search-results-title">
       <div class="section-heading results-title-row">
-        <div id="search-results-title" class="card-title">{{ resultTitle }}</div>
+        <h2 id="search-results-title" class="card-title">{{ resultTitle }}</h2>
         <span class="result-total">{{ results.length }} 条</span>
       </div>
       <Transition name="result-page" mode="out-in">
@@ -223,7 +223,7 @@ function askAi() {
 .search-box input { width: 100%; min-width: 0; min-height: 52px; padding: 12px 48px 12px 44px; background: oklch(0.96 0 0 / 0.035); font-size: 14px; }
 .search-box input::-webkit-search-cancel-button { display: none; }
 .search-icon { position: absolute; z-index: 1; left: 15px; width: 19px; height: 19px; fill: none; stroke: var(--ink-soft); stroke-width: 1.4; stroke-linecap: round; pointer-events: none; }
-.clear-search { position: absolute; right: 5px; display: grid; width: 40px; height: 40px; padding: 0; place-items: center; border: 0; background: transparent; color: var(--ink-soft); cursor: pointer; }
+.clear-search { position: absolute; right: 4px; display: grid; width: 44px; height: 44px; padding: 0; place-items: center; border: 0; background: transparent; color: var(--ink-soft); cursor: pointer; }
 .clear-search:hover { color: var(--ink); }
 .clear-search svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.3; stroke-linecap: round; }
 .search-meta { display: flex; margin-top: 10px; justify-content: space-between; flex-wrap: wrap; gap: 6px 14px; color: var(--muted); font-size: 10px; line-height: 1.7; }
@@ -266,10 +266,10 @@ function askAi() {
 .hot-summary { display: -webkit-box; margin-top: 8px; overflow: hidden; color: var(--ink-soft); font-size: 12px; line-height: 1.75; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .hot-footer { display: flex; margin-top: auto; padding-top: 14px; align-items: center; justify-content: space-between; color: var(--muted); font-size: 10px; }
 .luck-text { color: var(--ink-soft); }
-.text-button { min-height: 40px; padding: 6px 0 6px 12px; border: 0; background: transparent; color: var(--ink-soft); cursor: pointer; font-size: 12px; text-decoration: underline; text-underline-offset: 4px; white-space: nowrap; }
+.text-button { min-height: 44px; padding: 6px 0 6px 12px; border: 0; background: transparent; color: var(--ink-soft); cursor: pointer; font-size: 12px; text-decoration: underline; text-underline-offset: 4px; white-space: nowrap; }
 .text-button:hover { color: var(--ink); }
 .category-list { display: flex; flex-wrap: wrap; gap: 8px; }
-.category-button { display: inline-flex; min-height: 42px; padding: 8px 13px; align-items: center; gap: 9px; border: 1px solid var(--line); border-radius: 0; background: transparent; color: var(--ink-soft); cursor: pointer; font-size: 12px; transition: color 160ms ease, border-color 160ms ease, background-color 160ms ease; }
+.category-button { display: inline-flex; min-height: 44px; padding: 8px 13px; align-items: center; gap: 9px; border: 1px solid var(--line); border-radius: 0; background: transparent; color: var(--ink-soft); cursor: pointer; font-size: 12px; transition: color 160ms ease, border-color 160ms ease, background-color 160ms ease; }
 .category-button:hover { border-color: var(--ink-soft); color: var(--ink); }
 .category-button.is-active { border-color: var(--ink); background: var(--ink); color: var(--paper); }
 .category-count { color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }

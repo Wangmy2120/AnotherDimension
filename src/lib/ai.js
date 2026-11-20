@@ -1,37 +1,10 @@
-const SETTINGS_KEY = 'tianji.settings'
-
-export const DEFAULT_SETTINGS = {
-  baseUrl: 'https://api.deepseek.com',
-  apiKey: '',
-  model: 'deepseek-chat'
-}
-
-export function loadSettings() {
-  try {
-    return { ...DEFAULT_SETTINGS, ...JSON.parse(localStorage.getItem(SETTINGS_KEY)) }
-  } catch {
-    return { ...DEFAULT_SETTINGS }
-  }
-}
-
-export function saveSettings(s) {
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(s))
-}
-
-const SYSTEM_PROMPT = `你是一位精通《周易》、八字命理、传统黄历与二十八宿的国学文化讲解员，为用户解读一款传统文化娱乐工具生成的每日运势数据。
-
-要求：
-1. 用通俗优雅、略带古韵的现代白话解读，引经据典时给出白话释义。
-2. 语气积极温和、趋吉避凶、引人向善，体现传统文化的生活智慧。
-3. 这是文化体验与娱乐参考，严禁给出医疗诊断、用药、投资、赌博等具体建议；遇到凶象以化解心态、谨慎行事的角度温和引导，不制造恐惧。
-4. 结构清晰，分小节输出（可用「今日气象」「卦象点拨」「行事建议」「寄语」等小标题），总长 400-600 字。
-5. 结尾不需要重复免责声明，应用界面已展示。`
+export const AI_ENDPOINT = '/functions/v1/app/interpret'
 
 export function buildContext({ dayInfo, bazi, fortune, solar, hexResult, question, dream }) {
   const ctx = {
     日期: `${dayInfo.dateStr}（农历${dayInfo.lunarText}）`,
     干支: `${dayInfo.yearGanZhi}年 ${dayInfo.monthGanZhi}月 ${dayInfo.dayGanZhi}日`,
-    黄历: { 宜: dayInfo.yi.slice(0, 8), 忌: dayInfo.ji.slice(0, 8), 冲煞: `冲${dayInfo.chong} 煞${dayInfo.sha}` },
+    黄历: { 宜: dayInfo.yi.slice(0, 8), 忌: dayInfo.ji.slice(0, 8), 冲煞: dayInfo.chongLabel },
     值日星宿: { 星宿: dayInfo.xiu, 吉凶: dayInfo.xiuLuck },
     节气: `${dayInfo.prevJie.name}后，${dayInfo.nextJie.name}前`
   }
@@ -76,28 +49,29 @@ export function buildContext({ dayInfo, bazi, fortune, solar, hexResult, questio
   return `${ask}\n${JSON.stringify(ctx, null, 1)}`
 }
 
-export async function streamInterpret(context, settings, onDelta, signal) {
-  const url = settings.baseUrl.replace(/\/+$/, '') + '/chat/completions'
-  const res = await fetch(url, {
+async function errorMessage(response) {
+  if (response.status === 404 || response.status === 503) return 'AI 解读暂未开放。'
+  if (response.status === 429) return '请求过于频繁，请稍后再试。'
+  try {
+    const data = await response.json()
+    if (typeof data?.error === 'string' && data.error.trim()) return data.error.trim()
+  } catch { /* 服务不可用或返回非 JSON */ }
+  return 'AI 解读暂时不可用，请稍后再试。'
+}
+
+export async function streamInterpret(context, onDelta, signal) {
+  const res = await fetch(AI_ENDPOINT, {
     method: 'POST',
     signal,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${settings.apiKey}`
-    },
-    body: JSON.stringify({
-      model: settings.model,
-      stream: true,
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: context }
-      ]
-    })
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ context })
   })
-  if (!res.ok) {
-    const text = await res.text().catch(() => '')
-    throw new Error(`接口返回 ${res.status}：${text.slice(0, 200) || res.statusText}`)
+  if (!res.ok) throw new Error(await errorMessage(res))
+  if (!res.body) throw new Error('AI 解读暂时不可用，请稍后再试。')
+  if (!(res.headers.get('content-type') || '').includes('text/event-stream')) {
+    throw new Error('AI 解读暂未开放。')
   }
+
   const reader = res.body.getReader()
   const decoder = new TextDecoder()
   let buffer = ''

@@ -8,12 +8,12 @@ import TimeCompass from './TimeCompass.vue'
 const emit = defineEmits(['continue'])
 const form = reactive({
   calendar: store.profile?.calendar || 'solar',
-  solarDate: '1995-01-01',
-  lunarYear: 1995,
-  lunarMonth: 1,
-  lunarDay: 1,
+  solarDate: '',
+  lunarYear: '',
+  lunarMonth: '',
+  lunarDay: '',
   leap: false,
-  time: '12:00',
+  time: '',
   gender: ''
 })
 function syncForm(p) {
@@ -38,12 +38,20 @@ const chart = computed(() => bazi())
 
 function submit() {
   error.value = ''
+  if (!form.time) {
+    error.value = '请填写出生时间。'
+    return
+  }
   const [hour, minute] = form.time.split(':').map(Number)
   let candidate
   if (form.calendar === 'solar') {
     const [year, month, day] = form.solarDate.split('-').map(Number)
     if (!year || !month || !day) {
       error.value = '请填写完整的出生日期。'
+      return
+    }
+    if (year < 1901 || year > 2099) {
+      error.value = '出生日期超出支持范围（1901—2099）。'
       return
     }
     candidate = { calendar: 'solar', year, month, day, hour, minute, gender: form.gender }
@@ -69,23 +77,23 @@ function submit() {
   <section class="home-profile" aria-labelledby="profile-title">
     <div class="profile-heading">
       <div>
-        <span class="profile-code">ORIGIN / 001</span>
+        <span class="profile-code">今日 / ORIGIN</span>
         <h2 id="profile-title">校准你的时空</h2>
-        <p>以观测位置定位太阳，以生辰展开个人命轨。</p>
+        <p>位置与生辰，在同一屏完成校准；资料仅保存在此浏览器。</p>
       </div>
       <div class="profile-tools">
         <DateBar />
-        <button class="settings-link" type="button" @click="store.tabRequest = 'settings'">
+        <a class="settings-link" href="#/settings">
           校准与设置<span aria-hidden="true">↗</span>
-        </button>
+        </a>
       </div>
     </div>
 
     <div class="profile-grid">
       <TimeCompass />
-      <form class="birth-panel" @submit.prevent="submit">
+      <form class="birth-panel" novalidate @submit.prevent="submit">
         <div class="birth-heading">
-          <span class="profile-code">BIRTH ARCHIVE / LOCAL</span>
+          <span class="profile-code">生辰 / BIRTH ARCHIVE · LOCAL</span>
           <h3>录入生辰</h3>
           <p>资料仅保存在此浏览器，只有主动生成 AI 解读时才会使用。</p>
         </div>
@@ -133,45 +141,53 @@ function submit() {
 </template>
 
 <style scoped>
-.home-profile { max-width: 1600px; min-height: 100vh; margin: 0 auto; padding: 140px 64px 110px; border-bottom: 1px solid var(--line); }
-.profile-heading { display: flex; margin-bottom: 70px; align-items: flex-end; justify-content: space-between; gap: 40px; }
+.home-profile {
+  max-width: 1600px;
+  min-height: calc(100svh - var(--header-h));
+  margin: 0 auto;
+  padding: 38px 64px 46px;
+  border-bottom: 1px solid var(--line);
+  scroll-margin-top: var(--header-h);
+}
+.profile-heading { display: flex; margin-bottom: 26px; align-items: flex-end; justify-content: space-between; gap: 32px; }
 .profile-code { display: block; color: var(--muted); font-size: 10px; letter-spacing: 0.24em; }
-.profile-heading h2 { margin-top: 16px; font-family: 'Noto Serif SC', 'Songti SC', 'STSong', serif; font-size: clamp(38px, 4.4vw, 64px); font-weight: 400; letter-spacing: 0.1em; }
-.profile-heading h2 + p { margin-top: 16px; color: var(--muted); font-family: 'Noto Serif SC', 'Songti SC', 'STSong', serif; font-size: 13px; letter-spacing: 0.1em; }
-.profile-tools { display: flex; align-items: flex-end; flex-direction: column; gap: 10px; }
+.profile-heading h2 { margin-top: 10px; font-family: 'Noto Serif SC', 'Songti SC', 'STSong', serif; font-size: clamp(34px, 3.2vw, 48px); font-weight: 400; letter-spacing: 0.1em; line-height: 1.12; }
+.profile-heading h2 + p { margin-top: 10px; color: var(--muted); font-family: 'Noto Serif SC', 'Songti SC', 'STSong', serif; font-size: 12px; letter-spacing: 0.08em; line-height: 1.7; }
+.profile-tools { display: flex; align-items: flex-end; flex-direction: column; gap: 8px; }
 .profile-tools :deep(.date-bar) { margin-bottom: 0; }
-.settings-link { display: inline-flex; min-height: 44px; padding: 0; align-items: center; gap: 14px; border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 11px; letter-spacing: 0.12em; }
+.settings-link { display: inline-flex; min-height: 44px; padding: 0; align-items: center; gap: 14px; border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 12px; letter-spacing: 0.1em; text-decoration: none; }
 .settings-link:hover { color: var(--ink); }
-.profile-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(48px, 8vw, 130px); }
+.profile-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; gap: clamp(40px, 6vw, 96px); }
 .profile-grid :deep(.telemetry-panel) { align-self: start; }
-.birth-panel { padding: 32px 0; align-self: start; border-block: 1px solid var(--line-strong); }
-.birth-heading { margin-bottom: 34px; }
-.birth-heading h3 { margin-top: 12px; font-family: 'Noto Serif SC', 'Songti SC', 'STSong', serif; font-size: 28px; font-weight: 400; letter-spacing: 0.14em; }
-.birth-heading p { margin-top: 12px; color: var(--muted); font-size: 11px; line-height: 1.8; }
-.calendar-choice { display: flex; margin-bottom: 24px; gap: 24px; }
+.birth-panel { padding: 20px 0; align-self: start; border-block: 1px solid var(--line-strong); }
+.birth-heading { margin-bottom: 18px; }
+.birth-heading h3 { margin-top: 8px; font-family: 'Noto Serif SC', 'Songti SC', 'STSong', serif; font-size: 24px; font-weight: 400; letter-spacing: 0.14em; }
+.birth-heading p { margin-top: 8px; color: var(--muted); font-size: 10.5px; line-height: 1.65; }
+.calendar-choice { display: flex; margin-bottom: 12px; gap: 24px; }
 .calendar-choice label,
 .leap-field { display: flex; min-height: 44px; align-items: center; gap: 8px; color: var(--ink-soft); font-size: 12px; }
-.field { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 8px; color: var(--muted); font-size: 10px; letter-spacing: 0.1em; }
+.field { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 6px; color: var(--muted); font-size: 12px; letter-spacing: 0.08em; }
 .field input,
 .field select { width: 100%; }
 .lunar-fields { display: grid; grid-template-columns: 1.2fr 0.8fr 0.8fr auto; align-items: end; gap: 10px; }
-.birth-time-row { display: flex; margin-top: 20px; gap: 14px; }
-.chart-preview { display: grid; margin-top: 28px; grid-template-columns: repeat(4, 1fr); border-block: 1px solid var(--line); }
-.chart-preview span { display: flex; padding: 18px 8px; align-items: center; flex-direction: column; gap: 8px; font-family: 'Noto Serif SC', 'Songti SC', 'STSong', serif; font-size: 22px; }
+.birth-time-row { display: flex; margin-top: 12px; gap: 10px; }
+.chart-preview { display: grid; margin-top: 16px; grid-template-columns: repeat(4, 1fr); border-block: 1px solid var(--line); }
+.chart-preview span { display: flex; padding: 12px 6px; align-items: center; flex-direction: column; gap: 5px; font-family: 'Noto Serif SC', 'Songti SC', 'STSong', serif; font-size: 20px; }
 .chart-preview span + span { border-left: 1px solid var(--line); }
 .chart-preview small { color: var(--muted); font-family: 'DM Sans', sans-serif; font-size: 10px; }
-.birth-error { margin-top: 18px; color: var(--ink); font-size: 12px; }
-.birth-actions { display: flex; margin-top: 30px; flex-wrap: wrap; gap: 12px; }
+.birth-error { margin-top: 10px; color: var(--ink); font-size: 12px; }
+.birth-actions { display: flex; margin-top: 18px; flex-wrap: wrap; gap: 10px; }
 
 @media (max-width: 900px) {
-  .home-profile { min-height: 0; padding: 120px 28px 80px; }
-  .profile-heading { margin-bottom: 44px; align-items: flex-start; flex-direction: column; }
+  .home-profile { min-height: calc(100svh - var(--header-h)); padding: 30px 28px 54px; }
+  .profile-heading { margin-bottom: 28px; align-items: flex-start; flex-direction: column; gap: 22px; }
   .profile-tools { width: 100%; align-items: flex-start; }
-  .profile-grid { grid-template-columns: 1fr; gap: 54px; }
+  .profile-grid { grid-template-columns: 1fr; gap: 38px; }
+  .birth-panel { order: -1; }
 }
 @media (max-width: 520px) {
-  .home-profile { padding: 110px 22px 64px; }
-  .profile-heading h2 { font-size: 38px; }
+  .home-profile { padding: 24px 22px 48px; }
+  .profile-heading h2 { font-size: 36px; }
   .lunar-fields { grid-template-columns: 1.2fr 0.8fr 0.8fr; }
   .leap-field { grid-column: 1 / -1; }
   .birth-time-row { flex-direction: column; }

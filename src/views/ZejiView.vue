@@ -60,7 +60,7 @@ const resultKey = computed(() => [
   profileBazi.value?.shengXiao || 'none'
 ].join(':'))
 
-const results = computed(() => {
+const scannedDays = computed(() => {
   const base = new Date(todayStr() + 'T00:00:00')
   const sx = profileBazi.value?.shengXiao
   const out = []
@@ -70,13 +70,18 @@ const results = computed(() => {
     const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
     const info = getDayInfo(ds)
     const matched = event.value.terms.filter(t => info.yi.includes(t))
-    if (!matched.length) continue
-    const chongMe = sx && info.chong.endsWith(sx)
-    if (avoidChong.value && chongMe) continue
-    out.push({ info, matched, chongMe })
+    const chongMe = Boolean(sx && info.chong.endsWith(sx))
+    out.push({
+      info,
+      matched,
+      chongMe,
+      isAuspicious: matched.length > 0 && !(avoidChong.value && chongMe)
+    })
   }
   return out
 })
+
+const results = computed(() => scannedDays.value.filter(day => day.isAuspicious))
 
 function gotoDay(ds) {
   store.dateStr = ds
@@ -90,7 +95,7 @@ function gotoDay(ds) {
       <div class="filter-heading">
         <div>
           <span class="eyebrow">择事 · 观日 · 避冲</span>
-          <div id="zeji-title" class="card-title">择吉日</div>
+          <h2 id="zeji-title" class="card-title">择吉日</h2>
         </div>
         <span class="scan-note">未来 {{ range }} 天</span>
       </div>
@@ -133,9 +138,30 @@ function gotoDay(ds) {
       </div>
     </section>
 
+    <section class="card density-card" aria-labelledby="density-title">
+      <div class="results-heading">
+        <h2 id="density-title" class="card-title">宜事密度</h2>
+        <span class="result-count"><strong>{{ results.length }}</strong> 天</span>
+      </div>
+      <div class="density-calendar" role="list" :aria-label="`未来${range}天宜${event.name}的日期密度`">
+        <span
+          v-for="day in scannedDays"
+          :key="day.info.dateStr"
+          class="density-day"
+          :class="{ 'is-good': day.isAuspicious, 'is-chong': day.chongMe, 'is-today': day.info.dateStr === todayStr() }"
+          role="listitem"
+          :aria-label="`${day.info.dateStr}${day.isAuspicious ? `，宜${event.name}` : ''}${day.chongMe ? '，冲生肖' : ''}`"
+        >
+          <i></i>
+          <small>{{ day.info.dateStr.slice(8) }}</small>
+        </span>
+      </div>
+      <p class="density-note">墨色高柱为同时满足事项与避冲的候选日；横向可浏览全部 {{ range }} 天。</p>
+    </section>
+
     <section class="card results-card" aria-labelledby="results-title">
       <div class="results-heading">
-        <div id="results-title" class="card-title">宜「{{ event.name }}」的吉日</div>
+        <h2 id="results-title" class="card-title">宜「{{ event.name }}」的吉日</h2>
         <span class="result-count"><strong>{{ results.length }}</strong> 天</span>
       </div>
 
@@ -166,7 +192,7 @@ function gotoDay(ds) {
                 <span class="matched-tags">
                   <span v-for="t in r.matched" :key="t" class="tag yi">{{ t }}</span>
                 </span>
-                <span class="day-caution">冲{{ r.info.chong }} · 煞{{ r.info.sha }}</span>
+                <span class="day-caution">{{ r.info.chongLabel }}</span>
               </span>
               <span class="day-link">
                 详情
@@ -227,7 +253,7 @@ function gotoDay(ds) {
 .range-options { display: flex; flex-wrap: wrap; gap: 7px; }
 .range-button {
   min-width: 66px;
-  min-height: 40px;
+  min-height: 44px;
   padding: 8px 13px;
   border: 1px solid var(--line-strong);
   border-radius: 0;
@@ -238,10 +264,19 @@ function gotoDay(ds) {
   transition: color 180ms ease, background-color 180ms ease, border-color 180ms ease, box-shadow 220ms ease;
 }
 .range-button:hover { border-color: var(--ink-soft); color: var(--ink); }
-.avoid-option { display: inline-flex; min-height: 40px; margin-left: auto; align-items: center; gap: 9px; color: var(--ink-soft); cursor: pointer; font-size: 12px; line-height: 1.6; }
+.avoid-option { display: inline-flex; min-height: 44px; margin-left: auto; align-items: center; gap: 9px; color: var(--ink-soft); cursor: pointer; font-size: 12px; line-height: 1.6; }
 .avoid-option input { flex: 0 0 auto; }
 .results-heading { margin-bottom: 14px; }
 .results-heading .card-title { min-width: 0; margin-bottom: 0; }
+.density-card { overflow: hidden; }
+.density-calendar { display: flex; padding: 10px 0 8px; gap: 3px; overflow-x: auto; scrollbar-width: thin; }
+.density-day { display: flex; width: 18px; flex: 0 0 18px; align-items: center; flex-direction: column; gap: 5px; }
+.density-day i { display: block; width: 100%; height: 10px; border: 1px solid var(--line); background: transparent; }
+.density-day.is-good i { height: 30px; border-color: var(--silver); background: var(--silver); box-shadow: 0 0 10px oklch(0.97 0 0 / 0.14); }
+.density-day.is-chong i { opacity: 0.35; }
+.density-day small { color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+.density-day.is-today small { color: var(--glow); }
+.density-note { margin-top: 4px; color: var(--muted); font-size: 12px; line-height: 1.7; }
 .result-count { display: inline-flex; align-items: baseline; flex: 0 0 auto; gap: 5px; color: var(--muted); font-size: 12px; }
 .result-count strong { color: var(--ink); font-size: 24px; font-weight: 300; font-variant-numeric: tabular-nums; }
 .result-page { min-height: 60px; }

@@ -5,6 +5,8 @@ import { gsap } from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { subscribeMotion } from '../lib/motion.js'
 import { sound } from '../lib/sound.js'
+import { createInkBrushSprites } from '../lib/inkTexture.js'
+import ChapterInstrument from './ChapterInstrument.vue'
 
 gsap.registerPlugin(ScrollTrigger)
 
@@ -26,7 +28,7 @@ const opening = ref(false)
 const staticMode = computed(() => reducedMotion.value || webglFailed.value)
 const progressPercent = computed(() => Math.round(progress.value * 100))
 const displayIndex = computed(() => previewIndex.value ?? activeIndex.value)
-const ITEM_COUNT = 6
+const ITEM_COUNT = props.items.length
 
 let renderer
 let scene
@@ -54,7 +56,7 @@ let dragX = 0
 let zoomOverlay = null
 let zoomTimers = []
 let inkContext
-let inkSprite
+let inkSprites = []
 let inkWidth = 1
 let inkHeight = 1
 let inkFrontContext
@@ -185,21 +187,6 @@ function goChapter(index) {
   window.scrollTo({ top: top + travel * ratio, behavior: reducedMotion.value ? 'auto' : 'smooth' })
 }
 
-function createInkSprite() {
-  const sprite = document.createElement('canvas')
-  sprite.width = 128
-  sprite.height = 128
-  const context = sprite.getContext('2d')
-  const gradient = context.createRadialGradient(64, 64, 1, 64, 64, 63)
-  gradient.addColorStop(0, 'rgba(247,248,246,0.82)')
-  gradient.addColorStop(0.28, 'rgba(240,242,240,0.3)')
-  gradient.addColorStop(0.62, 'rgba(232,235,232,0.07)')
-  gradient.addColorStop(1, 'rgba(232,235,232,0)')
-  context.fillStyle = gradient
-  context.fillRect(0, 0, 128, 128)
-  return sprite
-}
-
 function resizeInkCanvas() {
   const canvas = inkCanvas.value
   if (!canvas) return
@@ -227,11 +214,11 @@ function resizeInkCanvas() {
   } else {
     inkFrontContext = undefined
   }
-  if (!inkSprite) inkSprite = createInkSprite()
+  if (!inkSprites.length) inkSprites = createInkBrushSprites(isMobile.value ? 4 : 6, 128)
 }
 
 function drawInkCanvas(now) {
-  if (!inkContext || !inkSprite) return
+  if (!inkContext || !inkSprites.length) return
   const context = inkContext
   const delta = inkLastTime ? clamp((now - inkLastTime) / 1000, 0.001, 0.05) : 0.016
   inkLastTime = now
@@ -240,7 +227,7 @@ function drawInkCanvas(now) {
   inkFlow += delta * (0.055 + scrollSpeed * 0.16)
 
   context.clearRect(0, 0, inkWidth, inkHeight)
-  context.globalCompositeOperation = 'lighter'
+  context.globalCompositeOperation = 'source-over'
 
   const centerX = inkWidth * 0.5
   const centerY = inkHeight * 0.49
@@ -280,12 +267,32 @@ function drawInkCanvas(now) {
     previous = point
   }
 
-  const count = isMobile.value ? 24 : 56
+  context.save()
+  context.lineCap = 'round'
+  for (let index = 0; index < 120; index += 1) {
+    if (index % 11 < 2) continue
+    const d = -3.1 + index / 120 * 6.2
+    const point = sample(d)
+    const tail = sample(d + 0.026)
+    context.globalAlpha = 0.04 + point.depth * 0.12
+    context.beginPath()
+    context.moveTo(point.x, point.y)
+    context.lineTo(tail.x, tail.y)
+    context.strokeStyle = 'rgba(244,246,244,0.9)'
+    context.lineWidth = 0.8 + point.depth * 2.1
+    context.stroke()
+  }
+  context.restore()
+  context.globalAlpha = 1
+
+  const count = isMobile.value ? 26 : 68
+  const bloomSprites = Math.min(3, inkSprites.length)
   for (let index = 0; index < count; index += 1) {
     const particle = inkParticles[index % inkParticles.length]
     const d = -2.9 + ((particle.seed * 5.8 + inkFlow * particle.speed) % 5.8)
     const fade = clamp(1 - Math.abs(d) / 3.1)
     if (fade <= 0.02) continue
+    const brush = inkSprites[index % bloomSprites]
     for (let trail = 0; trail < 3; trail += 1) {
       const trailD = d - trail * 0.065 * particle.speed
       const point = sample(trailD)
@@ -295,12 +302,60 @@ function drawInkCanvas(now) {
       const alpha = (0.12 + depth * 0.36) * fade * (1 - trail * 0.24)
       context.globalAlpha = alpha
       context.drawImage(
-        inkSprite,
+        brush,
         point.x + wobble - size,
         point.y - size + Math.cos(now * 0.00029 + particle.seed * 13) * 3.5,
         size * 2,
         size * 2
       )
+    }
+  }
+
+  context.globalCompositeOperation = 'lighter'
+  const washes = isMobile.value ? 2 : 4
+  for (let index = 0; index < washes; index += 1) {
+    const travel = (inkFlow * 0.016 + index / washes + progress.value * 0.18) % 1
+    const d = -2.4 + travel * 4.8
+    const point = sample(d)
+    const size = (72 + point.depth * 72) * (isMobile.value ? 0.72 : 1)
+    const brush = inkSprites[(index + 1) % inkSprites.length]
+    context.globalAlpha = 0.22 + point.depth * 0.18
+    context.drawImage(brush, point.x - size, point.y - size * 0.6, size * 2, size * 1.2)
+  }
+
+  context.globalCompositeOperation = 'multiply'
+  for (let index = 0; index < 6; index += 1) {
+    const travel = (index + 0.5) / 6
+    const d = -2.8 + travel * 5.6
+    const point = sample(d)
+    const size = 34 + point.depth * 28
+    context.globalAlpha = 0.05 + point.depth * 0.045
+    context.drawImage(inkSprites[(index + 2) % inkSprites.length], point.x - size, point.y - size * 0.62, size * 2, size * 1.24)
+  }
+  context.globalAlpha = 1
+  context.globalCompositeOperation = 'lighter'
+
+  const comets = isMobile.value ? 2 : 3
+  for (let index = 0; index < comets; index += 1) {
+    const travel = (inkFlow * (0.11 + index * 0.018) + index / comets + progress.value * 0.32) % 1
+    const d = -2.85 + travel * 5.7
+    const envelope = Math.sin(travel * Math.PI)
+    const point = sample(d)
+    const depth = point.depth
+    const cometBrush = inkSprites[(index + 3) % inkSprites.length]
+    for (let trail = 0; trail < 7; trail += 1) {
+      const tailPoint = sample(d - trail * 0.038)
+      const size = (index === 0 ? 15 : 8) * (1 - trail * 0.1) * (0.7 + depth * 0.7)
+      context.globalAlpha = envelope * (0.14 + depth * 0.26) * (1 - trail / 7)
+      context.drawImage(cometBrush, tailPoint.x - size, tailPoint.y - size, size * 2, size * 2)
+    }
+    if (index === 0) {
+      const glint = (2.2 + Math.sin(now * 0.0014) * 0.8) * (isMobile.value ? 0.7 : 1)
+      context.globalAlpha = envelope * 0.4
+      context.fillStyle = 'rgba(246,247,245,0.82)'
+      context.beginPath()
+      context.arc(point.x, point.y, glint, 0, Math.PI * 2)
+      context.fill()
     }
   }
 
@@ -337,9 +392,10 @@ function drawInkCanvas(now) {
     front.lineWidth = 1.2
     front.stroke()
     front.setLineDash([])
-    const frontCount = isMobile.value ? 30 : 76
+    const frontCount = isMobile.value ? 34 : 90
     for (let index = 0; index < frontCount; index += 1) {
       const particle = inkParticles[(index + 7) % inkParticles.length]
+      const brush = inkSprites[(index + 1) % inkSprites.length]
       const drift = -1.55 + ((particle.seed * 3.1 + inkFlow * (0.14 + particle.speed * 0.08)) % 3.1)
       const point = sample(drift)
       const insideCard = point.x > cardLeft + 4 && point.x < cardRight - 4 && point.y > cardTop + 4 && point.y < cardBottom - 4
@@ -352,7 +408,7 @@ function drawInkCanvas(now) {
         ? 0.07 + point.depth * 0.1
         : 0.14 + point.depth * 0.2 + particle.seed * 0.03) * fade
       front.drawImage(
-        inkSprite,
+        brush,
         point.x + swayX - size * 1.35,
         point.y + swayY - size * 0.82,
         size * 2.7,
@@ -361,7 +417,7 @@ function drawInkCanvas(now) {
       const tail = sample(drift - 0.1 * particle.speed)
       front.globalAlpha *= 0.45
       front.drawImage(
-        inkSprite,
+        brush,
         tail.x + swayX * 0.7 - size * 0.8,
         tail.y + swayY * 0.7 - size * 0.5,
         size * 1.65,
@@ -370,7 +426,7 @@ function drawInkCanvas(now) {
       if (large) {
         front.globalAlpha *= 0.4
         front.drawImage(
-          inkSprite,
+          inkSprites[(index + 3) % inkSprites.length],
           point.x + swayX - size * 0.4,
           point.y + swayY - size * 1.5,
           size * 2,
@@ -894,7 +950,7 @@ onBeforeUnmount(() => {
   cleanupZoomOverlay()
   inkContext = undefined
   inkFrontContext = undefined
-  inkSprite = undefined
+  inkSprites = []
   intersectionObserver?.disconnect()
   motionQuery?.removeEventListener('change', handleMotionChange)
   mobileQuery?.removeEventListener('change', handleMobileChange)
@@ -910,7 +966,7 @@ onBeforeUnmount(() => {
     <template v-if="!staticMode">
       <div class="journey-intro">
         <div class="intro-inner">
-          <p>CELESTIAL INDEX / 06</p>
+          <p>星轨 / CELESTIAL INDEX · {{ String(items.length).padStart(2, '0') }}</p>
           <h2 id="journey-title">六章命轨，<br>皆为你所行。</h2>
           <span>向下滚动，沿银墨螺旋逐章靠近。当前章节停驻于中心，点选卡片即可抵达。</span>
           <i aria-hidden="true"></i>
@@ -948,16 +1004,15 @@ onBeforeUnmount(() => {
           <div class="stage-vignette" aria-hidden="true"></div>
 
           <nav class="chapter-deck" aria-label="六项星轨功能">
-            <button
+            <a
               v-for="(item, index) in items"
               :key="item.key"
               class="star-tab chapter-card"
               :class="{ active: index === activeIndex, preview: index === displayIndex }"
-              type="button"
+              :href="item.path"
               :aria-current="index === activeIndex ? 'step' : undefined"
               :aria-label="`打开${item.label}：${item.title}。${item.concept}`"
-              @click="openItem(item, $event)"
-              @keydown.enter.prevent="openItem(item, $event)"
+              @click.prevent="openItem(item, $event)"
               @pointerenter="previewItem(index)"
               @pointerleave="clearPreview(index)"
               @focus="previewItem(index)"
@@ -967,6 +1022,7 @@ onBeforeUnmount(() => {
                 <span class="chapter-code">{{ item.chapter }}</span>
                 <span class="chapter-station"><i aria-hidden="true"></i>STATION / {{ String(index + 1).padStart(2, '0') }}</span>
               </span>
+              <ChapterInstrument :type="item.key" :data="item.instrument" :active="index === activeIndex" />
               <span class="chapter-body">
                 <span class="chapter-lead">
                   <span class="chapter-name">{{ item.label }}</span>
@@ -988,12 +1044,12 @@ onBeforeUnmount(() => {
                 </span>
               </span>
               <span class="chapter-ghost" aria-hidden="true">{{ String(index + 1).padStart(2, '0') }}</span>
-            </button>
+            </a>
           </nav>
 
           <canvas ref="inkFrontCanvas" class="ink-spiral ink-spiral-front" aria-hidden="true"></canvas>
 
-          <nav class="chapter-jump" aria-label="章节快速定位">
+          <nav class="chapter-jump" aria-label="星轨站点">
             <button
               v-for="(item, index) in items"
               :key="item.key"
@@ -1007,9 +1063,9 @@ onBeforeUnmount(() => {
           </nav>
 
           <div class="journey-progress">
-            <span class="progress-label">SCROLL / STAR RAIL</span>
+            <span class="progress-label">星轨 / STAR RAIL</span>
             <div class="progress-track" role="progressbar" aria-label="星轨滚动进度" aria-valuemin="0" aria-valuemax="100" :aria-valuenow="progressPercent"><i :style="{ transform: `scaleX(${progress})` }"></i></div>
-            <span class="progress-count">{{ String(activeIndex + 1).padStart(2, '0') }} — 06</span>
+            <span class="progress-count">{{ String(activeIndex + 1).padStart(2, '0') }} — {{ String(ITEM_COUNT).padStart(2, '0') }}</span>
           </div>
         </div>
       </div>
@@ -1018,23 +1074,24 @@ onBeforeUnmount(() => {
 
     <div v-else class="static-journey">
       <header class="static-heading">
-        <p>CELESTIAL INDEX / 06</p>
+        <p>星轨 / CELESTIAL INDEX · {{ String(items.length).padStart(2, '0') }}</p>
         <h2 id="journey-title">六章星轨</h2>
         <span>{{ webglFailed ? 'WebGL 暂不可用，星图已静态展开。' : '已依减少动态效果偏好静态展开。' }}</span>
       </header>
       <div class="static-grid">
-        <button
+        <a
           v-for="(item, index) in items"
           :key="item.key"
           class="star-tab chapter-card static-card"
-          type="button"
+          :href="item.path"
           :aria-label="`打开${item.label}：${item.title}。${item.concept}`"
-          @click="openItem(item, $event)"
+          @click.prevent="openItem(item, $event)"
         >
           <span class="chapter-card-top">
             <span class="chapter-code">{{ item.chapter }}</span>
             <span class="chapter-station"><i aria-hidden="true"></i>STATION / {{ String(index + 1).padStart(2, '0') }}</span>
           </span>
+          <ChapterInstrument :type="item.key" :data="item.instrument" :active="false" />
           <span class="chapter-body">
             <span class="chapter-lead">
               <span class="chapter-name">{{ item.label }}</span>
@@ -1056,7 +1113,7 @@ onBeforeUnmount(() => {
             </span>
           </span>
           <span class="chapter-ghost" aria-hidden="true">{{ String(index + 1).padStart(2, '0') }}</span>
-        </button>
+        </a>
       </div>
     </div>
   </section>
@@ -1117,9 +1174,11 @@ onBeforeUnmount(() => {
   opacity: 0;
   pointer-events: auto;
   text-align: left;
+  text-decoration: none;
   transform: translate(-50%, -50%);
   transform-origin: center;
   transform-style: preserve-3d;
+  transition: border-color 240ms ease, box-shadow 320ms ease;
   will-change: transform, opacity;
 }
 .chapter-card::before {
@@ -1141,7 +1200,10 @@ onBeforeUnmount(() => {
   content: '';
   opacity: 0.28;
 }
-.chapter-card:hover { border-color: oklch(0.97 0 0 / 0.62); }
+.chapter-card:hover {
+  border-color: oklch(0.97 0 0 / 0.68);
+  box-shadow: inset 0 1px oklch(0.97 0 0 / 0.16), 0 0 46px oklch(0.97 0 0 / 0.06), 0 32px 104px oklch(0 0 0 / 0.68);
+}
 .chapter-card:focus-visible {
   border-color: var(--glow);
   outline: 2px solid oklch(0.97 0 0 / 0.55);
@@ -1151,49 +1213,59 @@ onBeforeUnmount(() => {
 .chapter-card:focus-visible::before,
 .chapter-card.preview::before { opacity: 1; }
 .chapter-card.active {
-  border-color: oklch(0.72 0 0 / 0.62);
-  box-shadow: inset 0 1px oklch(0.97 0 0 / 0.16), 0 0 70px oklch(0.97 0 0 / 0.055), 0 35px 110px oklch(0 0 0 / 0.72);
+  border-color: oklch(0.72 0 0 / 0.66);
+  box-shadow: inset 0 1px oklch(0.97 0 0 / 0.18), 0 0 84px oklch(0.97 0 0 / 0.065), 0 35px 110px oklch(0 0 0 / 0.74);
 }
 .chapter-card.active::before { animation: chapter-breathe 6s ease-in-out infinite; }
+.chapter-card.preview .chapter-title { text-shadow: 0 0 34px oklch(0.97 0 0 / 0.16); }
+.chapter-card.preview .chapter-name::before { box-shadow: 0 0 12px oklch(0.97 0 0 / 0.55); }
+.chapter-card.active .chapter-station i { animation: station-pulse 2.6s ease-in-out infinite; }
 .chapter-card-top { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 20px; color: var(--muted); font-size: 10px; letter-spacing: 0.18em; }
 .chapter-station { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
 .chapter-station i { width: 5px; height: 5px; border: 1px solid var(--silver); background: var(--glow); box-shadow: 0 0 8px oklch(0.97 0 0 / 0.7); }
 .chapter-body { position: relative; z-index: 1; display: flex; min-height: 0; margin-top: clamp(12px, 2vh, 20px); flex: 1; flex-direction: column; }
 .chapter-lead { display: flex; min-width: 0; flex-direction: column; }
-.chapter-name { display: inline-flex; align-items: center; gap: 9px; color: var(--silver); font-size: 11px; letter-spacing: 0.28em; }
+.chapter-card.active .chapter-lead,
+.static-card .chapter-lead { max-width: 60%; }
+.chapter-name { display: inline-flex; align-items: center; gap: 9px; color: var(--silver); font-size: 12px; letter-spacing: 0.24em; }
 .chapter-name::before { width: 16px; height: 1px; flex: 0 0 16px; background: var(--silver); content: ''; }
 .chapter-title { margin-top: 9px; font-family: 'Noto Serif SC', 'Songti SC', 'STSong', serif; font-size: clamp(36px, 3.4vw, 52px); font-weight: 400; letter-spacing: 0.055em; line-height: 1.06; overflow-wrap: anywhere; }
 .chapter-concept { display: -webkit-box; max-width: 30em; margin-top: 11px; overflow: hidden; color: var(--silver); font-size: clamp(12px, 0.92vw, 13.5px); line-height: 1.75; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow-wrap: anywhere; }
-.chapter-live { display: -webkit-box; max-width: 34em; margin-top: 8px; padding-left: 10px; overflow: hidden; border-left: 1px solid var(--line-strong); color: var(--muted); font-size: 10.5px; line-height: 1.65; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow-wrap: anywhere; }
+.chapter-live { display: -webkit-box; max-width: 34em; margin-top: 8px; padding-left: 10px; overflow: hidden; border-left: 1px solid var(--line-strong); color: var(--muted); font-size: 12px; line-height: 1.65; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow-wrap: anywhere; }
 .chapter-side { display: flex; min-width: 0; margin-top: auto; padding-top: 11px; align-items: flex-end; justify-content: space-between; gap: 14px; border-top: 1px solid var(--line); }
 .chapter-metrics { display: flex; min-width: 0; flex: 1; flex-wrap: wrap; gap: 8px 18px; }
 .chapter-metric { display: flex; min-width: 0; flex: 0 1 auto; flex-direction: column; gap: 2px; }
-.chapter-metric-key { color: var(--muted); font-size: 9px; letter-spacing: 0.12em; }
+.chapter-metric-key { color: var(--muted); font-size: 10px; letter-spacing: 0.1em; }
 .chapter-metric-value { color: var(--glow); font-size: clamp(12px, 0.95vw, 15px); font-weight: 300; font-variant-numeric: tabular-nums; line-height: 1.3; overflow-wrap: anywhere; }
-.chapter-enter { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 10px; color: var(--silver); font-size: 10px; letter-spacing: 0.12em; }
+.chapter-enter { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 10px; color: var(--silver); font-size: 12px; letter-spacing: 0.1em; }
 .chapter-arrow { display: grid; width: 32px; height: 32px; flex: 0 0 32px; place-items: center; border: 1px solid var(--line-strong); border-radius: 50%; color: var(--glow); font-size: 13px; transition: background-color 220ms ease, border-color 220ms ease, transform 220ms ease; }
 .chapter-card:hover .chapter-arrow,
 .chapter-card:focus-visible .chapter-arrow { border-color: var(--glow); background: oklch(0.97 0 0 / 0.1); transform: translate(2px, -2px); }
-.chapter-card:not(.active) .chapter-live,
-.chapter-card:not(.active) .chapter-side { display: none; }
-.chapter-card:not(.active) .chapter-lead { flex: 1; justify-content: center; }
-.chapter-card:not(.active) .chapter-concept { opacity: 0.72; }
-.chapter-card:not(.active) .chapter-title { color: var(--silver); }
+.chapter-card:not(.active):not(.static-card) .chapter-title,
+.chapter-card:not(.active):not(.static-card) .chapter-concept,
+.chapter-card:not(.active):not(.static-card) .chapter-live,
+.chapter-card:not(.active):not(.static-card) .chapter-side { display: none; }
+.chapter-card:not(.active):not(.static-card) .chapter-lead { flex: 1; justify-content: center; }
+.chapter-card:not(.active):not(.static-card) .chapter-name { color: var(--glow); font-family: 'Noto Serif SC', 'Songti SC', 'STSong', serif; font-size: clamp(22px, 2.2vw, 32px); letter-spacing: 0.18em; }
+.chapter-card:not(.active):not(.static-card) .chapter-name::before { width: 24px; flex-basis: 24px; }
 .chapter-card.static-card .chapter-live { display: -webkit-box; }
 .chapter-card.static-card .chapter-side { display: flex; }
 .chapter-card.static-card .chapter-lead { flex: 0 1 auto; justify-content: flex-start; }
 .chapter-card.static-card .chapter-concept { opacity: 1; }
 .chapter-card.static-card .chapter-title { color: var(--glow); }
 .chapter-ghost { position: absolute; z-index: 0; right: clamp(10px, 1.6vw, 24px); bottom: clamp(2px, 0.8vh, 12px); color: transparent; font-family: 'DM Sans', ui-sans-serif, sans-serif; font-size: clamp(94px, 9vw, 150px); font-weight: 300; letter-spacing: -0.08em; line-height: 0.72; opacity: 0.6; pointer-events: none; -webkit-text-stroke: 1px oklch(0.97 0 0 / 0.035); }
-.chapter-jump { position: absolute; z-index: 7; bottom: 48px; left: 50%; display: flex; gap: 2px; transform: translateX(-50%); }
-.chapter-jump button { position: relative; display: inline-flex; min-height: 44px; padding: 4px 9px; align-items: center; gap: 5px; border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 11px; letter-spacing: 0.08em; white-space: nowrap; transition: color 180ms ease; }
-.chapter-jump button span { color: var(--mist); font-size: 10px; font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
-.chapter-jump button::after { position: absolute; right: 9px; bottom: 3px; left: 9px; height: 1px; background: var(--glow); content: ''; opacity: 0; transform: scaleX(0.4); transition: opacity 180ms ease, transform 180ms ease; }
+.chapter-jump { position: absolute; z-index: 7; bottom: 44px; left: 50%; display: flex; gap: 4px; transform: translateX(-50%); }
+.chapter-jump::before { position: absolute; top: 8px; right: 18px; left: 18px; height: 1px; background: linear-gradient(90deg, transparent, var(--line-strong), transparent); content: ''; }
+.chapter-jump button { position: relative; display: inline-flex; min-height: 44px; padding: 17px 9px 4px; align-items: center; gap: 5px; border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 12px; letter-spacing: 0.06em; white-space: nowrap; transition: color 180ms ease; }
+.chapter-jump button span { color: var(--mist); font-size: 11px; font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
+.chapter-jump button::before { position: absolute; z-index: 1; top: 5px; left: 50%; width: 6px; height: 6px; border: 1px solid var(--mist); background: var(--void); content: ''; transform: translateX(-50%) rotate(45deg); transition: background-color 180ms ease, border-color 180ms ease, box-shadow 220ms ease; }
+.chapter-jump button::after { position: absolute; right: 9px; bottom: 1px; left: 9px; height: 1px; background: var(--glow); content: ''; opacity: 0; transform: scaleX(0.4); transition: opacity 180ms ease, transform 180ms ease; }
 .chapter-jump button:hover { color: var(--silver); }
 .chapter-jump button.active { color: var(--glow); }
 .chapter-jump button.active span { color: var(--silver); }
-.chapter-jump button.active::after { opacity: 0.7; transform: scaleX(1); }
-.journey-progress { position: absolute; z-index: 7; right: clamp(28px, 6vw, 100px); bottom: 22px; left: clamp(28px, 6vw, 100px); display: grid; grid-template-columns: auto minmax(80px, 1fr) auto; align-items: center; gap: 20px; color: var(--muted); font-size: 10px; letter-spacing: 0.14em; font-variant-numeric: tabular-nums; }
+.chapter-jump button.active::before { border-color: var(--glow); background: var(--glow); box-shadow: 0 0 10px oklch(0.97 0 0 / 0.6); }
+.chapter-jump button.active::after { opacity: 0.35; transform: scaleX(1); }
+.journey-progress { position: absolute; z-index: 7; right: clamp(28px, 6vw, 100px); bottom: 22px; left: clamp(28px, 6vw, 100px); display: grid; grid-template-columns: auto minmax(80px, 1fr) auto; align-items: center; gap: 20px; color: var(--muted); font-size: 12px; letter-spacing: 0.1em; font-variant-numeric: tabular-nums; }
 .progress-track { height: 1px; background: var(--line); }
 .progress-track i { display: block; width: 100%; height: 100%; background: var(--silver); transform-origin: left; }
 .progress-count { color: var(--silver); }
@@ -1211,6 +1283,10 @@ onBeforeUnmount(() => {
 @keyframes chapter-breathe {
   0%, 100% { opacity: 0.45; transform: scale(1); }
   50% { opacity: 1; transform: scale(1.04); }
+}
+@keyframes station-pulse {
+  0%, 100% { opacity: 0.62; box-shadow: 0 0 5px oklch(0.97 0 0 / 0.38); }
+  50% { opacity: 1; box-shadow: 0 0 15px oklch(0.97 0 0 / 0.8); }
 }
 @keyframes halo-turn {
   to { transform: rotate(360deg); }
@@ -1234,22 +1310,25 @@ onBeforeUnmount(() => {
   .chapter-card-top { gap: 10px; font-size: 10px; letter-spacing: 0.12em; }
   .chapter-station { gap: 6px; }
   .chapter-body { margin-top: 11px; overflow: hidden; }
-  .chapter-name { gap: 8px; font-size: 10px; letter-spacing: 0.24em; }
+  .chapter-name { gap: 8px; font-size: 12px; letter-spacing: 0.18em; }
   .chapter-name::before { width: 13px; flex-basis: 13px; }
+  .chapter-card:not(.active):not(.static-card) .chapter-name { font-size: 24px; }
+  .chapter-card.active .chapter-lead,
+  .static-card .chapter-lead { max-width: 60%; }
   .chapter-title { margin-top: 7px; font-size: clamp(35px, 10.5vw, 47px); }
   .chapter-concept { max-width: none; margin-top: 8px; font-size: 12px; line-height: 1.68; -webkit-line-clamp: 3; }
-  .chapter-live { margin-top: 6px; font-size: 10px; line-height: 1.55; -webkit-line-clamp: 2; }
+  .chapter-live { margin-top: 6px; font-size: 12px; line-height: 1.55; -webkit-line-clamp: 2; }
   .chapter-side { padding-top: 8px; gap: 8px; }
   .chapter-metrics { gap: 6px 12px; }
-  .chapter-metric-key { font-size: 8px; letter-spacing: 0.08em; }
-  .chapter-metric-value { font-size: 11.5px; line-height: 1.25; }
+  .chapter-metric-key { font-size: 10px; letter-spacing: 0.06em; }
+  .chapter-metric-value { font-size: 12px; line-height: 1.25; }
   .chapter-enter { width: 34px; height: 34px; gap: 0; font-size: 0; }
   .chapter-arrow { width: 34px; height: 34px; flex-basis: 34px; }
   .chapter-ghost { right: 9px; bottom: 5px; font-size: 96px; }
   .compass-halo { top: 48%; width: 132vw; opacity: 0.08; }
   .chapter-jump { bottom: 38px; width: 100%; padding-inline: 8px; justify-content: center; gap: 0; }
-  .chapter-jump button { min-height: 40px; padding-inline: 4px; gap: 3px; font-size: 10px; }
-  .chapter-jump button span { font-size: 10px; }
+  .chapter-jump button { min-height: 44px; padding: 15px 3px 2px; gap: 3px; font-size: 12px; }
+  .chapter-jump button span { font-size: 11px; }
   .chapter-jump button::after { right: 4px; left: 4px; }
   .journey-progress { right: 18px; bottom: 12px; left: 18px; grid-template-columns: 1fr auto; gap: 12px; }
   .progress-label { display: none; }
@@ -1269,8 +1348,9 @@ onBeforeUnmount(() => {
   .chapter-ghost { font-size: 82px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .chapter-card { will-change: auto; }
+  .chapter-card { will-change: auto; transition: none; }
   .chapter-card.active::before { animation: none; opacity: 1; }
+  .chapter-card.active .chapter-station i { animation: none; }
   .compass-halo-outer,
   .compass-halo-inner { animation: none; }
 }
