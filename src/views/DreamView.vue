@@ -80,7 +80,7 @@ function askAi() {
       <span class="eyebrow">梦有所映 · 心有所答</span>
       <h2 id="dream-title" class="card-title">周公解梦</h2>
       <p class="muted intro">
-        梦者，心之影也。输入梦中关键词，查传统民俗释义，亦可请 AI 结合你的近况细细道来。仅供娱乐参考。
+        梦者，心之影也。输入梦中关键词，查传统民俗释义，亦可请智能解读结合你的近况细细道来。仅供娱乐参考。
       </p>
       <div class="search-box">
         <label class="sr-only" for="dream-search">输入梦境关键词</label>
@@ -113,7 +113,7 @@ function askAi() {
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="m12 3 1.5 5.5L19 10l-5.5 1.5L12 17l-1.5-5.5L5 10l5.5-1.5zM19 16l.7 2.3L22 19l-2.3.7L19 22l-.7-2.3L16 19l2.3-.7z" />
           </svg>
-          AI 深度解梦
+          智能深度解梦
         </button>
       </section>
     </Transition>

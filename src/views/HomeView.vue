@@ -3,7 +3,9 @@ import { computed, defineAsyncComponent, ref } from 'vue'
 import { bazi, dayInfo, fortune, store } from '../store.js'
 import { getDayInfo } from '../lib/calendar.js'
 import HomeProfile from '../components/HomeProfile.vue'
+import HomeAiConclusion from '../components/HomeAiConclusion.vue'
 import { chapterByKey } from '../data/chapters.js'
+import { LIUREN_PALACES, getLiurenLesson } from '../lib/liuren.js'
 
 const XIU_NAMES = ['角', '亢', '氐', '房', '心', '尾', '箕', '斗', '牛', '女', '虚', '危', '室', '壁', '奎', '娄', '胃', '昴', '毕', '觜', '参', '井', '鬼', '柳', '星', '张', '翼', '轸']
 
@@ -52,6 +54,17 @@ const modules = computed(() => {
   }))
   const xiuName = day.xiuName.replace(/宿$/, '')
   const zejiDays = futureDays(day.dateStr, 30)
+  const now = new Date()
+  const liurenLesson = getLiurenLesson({ dateStr: day.dateStr, hour: now.getHours(), minute: now.getMinutes() })
+  const savedLiuren = store.liurenSession && store.liurenSession.date === day.dateStr ? store.liurenSession : null
+  const liurenPalaces = savedLiuren
+    ? [savedLiuren.monthPalace, savedLiuren.dayPalace, savedLiuren.hourPalace]
+    : liurenLesson.steps.map(step => step.palace.name)
+  const liurenResultPalace = savedLiuren
+    ? LIUREN_PALACES.find(palace => palace.name === savedLiuren.result) || { name: savedLiuren.result, element: savedLiuren.element }
+    : liurenLesson.result
+  const liurenStepIndices = liurenPalaces.map(name => LIUREN_PALACES.findIndex(palace => palace.name === name))
+  const liurenResultIndex = LIUREN_PALACES.findIndex(palace => palace.name === liurenResultPalace.name)
   const skySnapshot = sky.value
   const skyMoment = skySnapshot?.moment ?? null
   const skyTargets = skyMoment
@@ -161,6 +174,28 @@ const modules = computed(() => {
       cta: '进入解梦'
     },
     {
+      key: 'liuren',
+      label: meta('liuren').label,
+      path: meta('liuren').path,
+      chapter: `${meta('liuren').number} / ${meta('liuren').code}`,
+      title: meta('liuren').title,
+      concept: '以小六壬六宫观此刻之机。月课起因，日课经过，时课落点；只辨方向，不定吉凶。',
+      description: savedLiuren
+        ? `${savedLiuren.lunar} · ${savedLiuren.time} · ${liurenResultPalace.name}`
+        : `${liurenLesson.monthLabel}${liurenLesson.lunarDay}日 · ${liurenLesson.hourBranch}时 · ${liurenResultPalace.name}`,
+      metrics: [
+        { label: '三课', value: liurenPalaces.join(' · ') },
+        { label: '落宫', value: `${liurenResultPalace.name} · ${liurenResultPalace.element}` }
+      ],
+      instrument: {
+        resultIndex: liurenResultIndex,
+        steps: liurenStepIndices,
+        resultName: liurenResultPalace.name,
+        resultElement: liurenResultPalace.element
+      },
+      cta: '进入小六壬'
+    },
+    {
       key: 'sky',
       label: meta('sky').label,
       path: meta('sky').path,
@@ -205,12 +240,10 @@ function continueJourney() {
     <CosmicHero />
     <HomeProfile @continue="continueJourney" />
     <SpiralJourney id="journey" :items="modules" @open="openModule" />
-    <section class="home-breath" aria-label="星轨留白"><p>七轨既明，静候一心。</p></section>
+    <HomeAiConclusion embedded />
   </div>
 </template>
 
 <style scoped>
 .home-view { position: relative; background: var(--void); }
-.home-breath { display: grid; height: 40vh; place-items: center; color: var(--muted); }
-.home-breath p { font-family: 'Noto Serif SC', 'Songti SC', serif; font-size: 13px; letter-spacing: 0.24em; }
 </style>

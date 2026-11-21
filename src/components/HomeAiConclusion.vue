@@ -3,8 +3,13 @@ import { computed, onBeforeUnmount, ref } from 'vue'
 import { bazi, dayInfo, fortune, store } from '../store.js'
 import { buildContext, streamInterpret } from '../lib/ai.js'
 import { chapterByKey } from '../data/chapters.js'
+import AiReadingGuide from './AiReadingGuide.vue'
 import { formatSolarTime, getSolarPosition, getTrueSolarTime } from '../lib/solar.js'
 
+const props = defineProps({
+  embedded: { type: Boolean, default: false }
+})
+const headingTag = computed(() => props.embedded ? 'h2' : 'h1')
 const text = ref('')
 const loading = ref(false)
 const error = ref('')
@@ -12,12 +17,16 @@ const started = ref(false)
 const generatedSignature = ref('')
 let controller
 
+const currentLiuren = computed(() => (
+  store.liurenSession && store.liurenSession.date === store.dateStr ? store.liurenSession : null
+))
 const inputsSignature = computed(() => JSON.stringify([
   store.dateStr,
   store.profile,
   store.location,
   store.hexSession,
-  store.dreamSession
+  store.dreamSession,
+  currentLiuren.value
 ]))
 const stale = computed(() => Boolean(generatedSignature.value) && generatedSignature.value !== inputsSignature.value)
 const included = computed(() => [
@@ -26,7 +35,8 @@ const included = computed(() => [
   '今日运势',
   bazi() ? '个人八字' : null,
   store.hexSession ? '本次卦象' : null,
-  store.dreamSession ? '本次梦境' : null
+  store.dreamSession ? '本次梦境' : null,
+  currentLiuren.value ? '此刻六壬课' : null
 ].filter(Boolean))
 const sourceItems = computed(() => {
   const day = dayInfo()
@@ -51,6 +61,14 @@ const sourceItems = computed(() => {
       label: '卦象',
       text: `${result.primaryName}${result.changedName ? ` → ${result.changedName}` : '（六爻安静）'}${result.movingTexts.length ? `；动爻：${result.movingTexts.map(item => item.name).join('、')}` : ''}。`,
       source: '《周易》公版原文'
+    })
+  }
+  if (currentLiuren.value) {
+    const liuren = currentLiuren.value
+    items.push({
+      label: '六壬课',
+      text: `所问：${liuren.question || '此刻整体'}；月课${liuren.monthPalace}；日课${liuren.dayPalace}；时课${liuren.hourPalace}；落宫${liuren.result}，属${liuren.element}。`,
+      source: '小六壬月日时三课'
     })
   }
   return items
@@ -79,6 +97,7 @@ async function generate() {
     context.question = store.hexSession.question
   }
   if (store.dreamSession) context.dream = store.dreamSession
+  if (currentLiuren.value) context.liuren = currentLiuren.value
 
   generatedSignature.value = inputsSignature.value
   loading.value = true
@@ -88,7 +107,7 @@ async function generate() {
       text.value += delta
     }, controller.signal)
   } catch (e) {
-    if (e.name !== 'AbortError') error.value = e.message || 'AI 解读暂时不可用，请稍后再试。'
+    if (e.name !== 'AbortError') error.value = e.message || '智能解读暂时不可用，请稍后再试。'
   } finally {
     loading.value = false
   }
@@ -98,19 +117,19 @@ onBeforeUnmount(() => controller?.abort())
 </script>
 
 <template>
-  <section class="ai-conclusion" aria-labelledby="conclusion-title">
+  <section class="ai-conclusion" :class="{ 'is-embedded': embedded }" aria-labelledby="conclusion-title">
     <div class="conclusion-intro">
       <div class="conclusion-orbit" aria-hidden="true">
         <i></i><i></i><span>合</span>
       </div>
       <div class="conclusion-copy">
         <span class="conclusion-code">{{ chapterByKey.synthesis.number }} / {{ chapterByKey.synthesis.code }}</span>
-        <h1 id="conclusion-title">万轨归一</h1>
+        <component :is="headingTag" id="conclusion-title" class="conclusion-title">万轨归一</component>
         <p class="conclusion-lead">将此刻的历法、太阳方位与你的个人资料汇聚成一份综合解读。</p>
         <div class="context-list" aria-label="本次解读包含的信息">
           <span v-for="item in included" :key="item">{{ item }}</span>
         </div>
-        <p class="conclusion-privacy">点击生成后，解读所需数据才会发送给站点的 AI 解读服务；原始经纬度不随请求发送。</p>
+        <p class="conclusion-privacy">点击生成后，解读所需数据才会发送给站点的智能解读服务；原始经纬度不随请求发送。</p>
         <button class="btn conclusion-button" type="button" :disabled="loading" @click="generate">
           {{ loading ? '正在综合解读…' : text ? '重新生成天机综述' : '生成我的天机综述' }}
           <span aria-hidden="true">↗</span>
@@ -120,8 +139,12 @@ onBeforeUnmount(() => controller?.abort())
 
     <div v-if="started" class="conclusion-result" aria-live="polite">
       <p v-if="stale && !loading" class="stale-note">资料已更新，可重新生成以保持结论一致。</p>
-      <p v-if="error" class="conclusion-error" role="alert">{{ error }}</p>
+      <p v-if="error" class="conclusion-error" role="alert">
+        {{ error }}
+        <a v-if="error.includes('暂未开放')" class="conclusion-config-link" href="#/settings">去配置智能解读</a>
+      </p>
       <div v-else-if="text || loading" class="conclusion-text" :class="{ streaming: loading }">{{ text || '正在汇聚历法与命盘信息…' }}</div>
+      <AiReadingGuide v-if="text && !error" />
       <details class="conclusion-sources">
         <summary>原文依据</summary>
         <ul>
@@ -132,7 +155,7 @@ onBeforeUnmount(() => controller?.abort())
           </li>
         </ul>
       </details>
-      <p class="conclusion-disclaimer">AI 生成内容仅供传统文化体验与娱乐参考，不构成人生决策建议。</p>
+      <p class="conclusion-disclaimer">智能生成内容仅供传统文化体验与娱乐参考，不构成人生决策建议。</p>
     </div>
   </section>
 </template>
@@ -149,7 +172,7 @@ onBeforeUnmount(() => controller?.abort())
 .conclusion-orbit i:nth-child(2) { inset: -5%; border-color: var(--line); transform: rotateX(66deg) rotateZ(-18deg); }
 .conclusion-orbit span { font-family: 'Noto Serif SC', 'Songti SC', 'STSong', serif; font-size: 58px; font-weight: 300; }
 .conclusion-code { color: var(--muted); font-size: 10px; letter-spacing: 0.24em; }
-.conclusion-copy h1 { margin-top: 18px; font-family: 'Noto Serif SC', 'Songti SC', 'STSong', serif; font-size: clamp(48px, 5.6vw, 78px); font-weight: 400; letter-spacing: 0.12em; }
+.conclusion-copy .conclusion-title { margin-top: 18px; font-family: 'Noto Serif SC', 'Songti SC', 'STSong', serif; font-size: clamp(48px, 5.6vw, 78px); font-weight: 400; letter-spacing: 0.12em; }
 .conclusion-lead { max-width: 540px; margin-top: 24px; color: var(--ink-soft); font-family: 'Noto Serif SC', 'Songti SC', 'STSong', serif; font-size: 15px; line-height: 2; }
 .context-list { display: flex; margin-top: 30px; flex-wrap: wrap; gap: 8px; }
 .context-list span { padding: 6px 10px; border: 1px solid var(--line); color: var(--ink-soft); font-size: 10px; letter-spacing: 0.08em; }
@@ -159,6 +182,7 @@ onBeforeUnmount(() => controller?.abort())
 .conclusion-text { color: var(--ink-soft); font-family: 'Noto Serif SC', 'Songti SC', 'STSong', serif; font-size: 16px; line-height: 2.15; white-space: pre-wrap; }
 .conclusion-text.streaming::after { content: ''; display: inline-block; width: 1px; height: 1.1em; margin-left: 5px; background: var(--ink); vertical-align: -0.15em; animation: conclusion-cursor 900ms steps(1) infinite; }
 .conclusion-error { margin-bottom: 20px; color: var(--ink); line-height: 1.8; }
+.conclusion-config-link { color: var(--ink); text-decoration: underline; text-underline-offset: 4px; }
 .stale-note { margin-bottom: 20px; color: var(--muted); font-size: 11px; }
 .conclusion-sources { margin-top: 28px; border-top: 1px solid var(--line); }
 .conclusion-sources summary { display: flex; min-height: 44px; align-items: center; color: var(--silver); cursor: pointer; font-size: 12px; letter-spacing: 0.1em; }
@@ -180,7 +204,7 @@ onBeforeUnmount(() => controller?.abort())
 }
 @media (max-width: 480px) {
   .ai-conclusion { padding: 90px 22px 72px; }
-  .conclusion-copy h2 { font-size: 48px; }
+  .conclusion-copy .conclusion-title { font-size: 48px; }
   .conclusion-orbit { width: 190px; }
   .conclusion-orbit span { font-size: 44px; }
 }

@@ -1,6 +1,7 @@
 export const AI_ENDPOINT = '/functions/v1/app/interpret'
+export const AI_CONFIG_ENDPOINT = '/functions/v1/app/ai-config'
 
-export function buildContext({ dayInfo, bazi, fortune, solar, hexResult, question, dream, sky }) {
+export function buildContext({ dayInfo, bazi, fortune, solar, hexResult, question, dream, sky, liuren, focus }) {
   const ctx = {
     日期: `${dayInfo.dateStr}（农历${dayInfo.lunarText}）`,
     干支: `${dayInfo.yearGanZhi}年 ${dayInfo.monthGanZhi}月 ${dayInfo.dayGanZhi}日`,
@@ -47,6 +48,16 @@ export function buildContext({ dayInfo, bazi, fortune, solar, hexResult, questio
   if (dream) {
     ctx.梦境 = { 关键词: dream.keyword, 民俗释义: dream.text, 传统吉凶: dream.luck }
   }
+  if (liuren) {
+    ctx.六壬课 = {
+      所问之事: liuren.question || '此刻整体',
+      日期: liuren.date,
+      时刻: liuren.time,
+      三课: `月课${liuren.monthPalace}，日课${liuren.dayPalace}，时课${liuren.hourPalace}`,
+      落宫: `${liuren.result}（属${liuren.element}，${liuren.verdict}）`,
+      断语: liuren.summary
+    }
+  }
   if (sky) {
     ctx.今夜星空 = {
       时刻: `${sky.dateStr} ${sky.clock}`,
@@ -61,20 +72,22 @@ export function buildContext({ dayInfo, bazi, fortune, solar, hexResult, questio
   }
   const ask = dream
     ? '以下是用户梦境的民俗释义与今日背景数据，请结合传统解梦文化与现代心理视角，温和积极地为用户解读此梦，并给出安心的生活建议：'
-    : sky
-      ? '以下是用户此刻所在地点实测推算的星空数据，请结合中国传统星宿文化与天文常识，解读今夜星空可观什么、何时看、朝哪个方位看，语气温克制，不作吉凶断言：'
-      : '以下是工具今日生成的数据，请综合解读：'
+    : focus === 'liuren' && liuren
+      ? '（问事模式）以下是用户刚刚起的小六壬课与所问之事，请正面回应用户关心的问题，结合课象说明当下的倾向，再给出具体可做的建议；不要写成日运四段：'
+      : sky
+        ? '以下是用户此刻所在地点实测推算的星空数据，请结合中国传统星宿文化与天文常识，解读今夜星空可观什么、何时看、朝哪个方位看，语气温克制，不作吉凶断言：'
+        : '以下是工具今日生成的数据，请综合解读：'
   return `${ask}\n${JSON.stringify(ctx, null, 1)}`
 }
 
 async function errorMessage(response) {
-  if (response.status === 404 || response.status === 503) return 'AI 解读暂未开放。'
+  if (response.status === 404 || response.status === 503) return '智能解读暂未开放。'
   if (response.status === 429) return '请求过于频繁，请稍后再试。'
   try {
     const data = await response.json()
     if (typeof data?.error === 'string' && data.error.trim()) return data.error.trim()
   } catch { /* 服务不可用或返回非 JSON */ }
-  return 'AI 解读暂时不可用，请稍后再试。'
+  return '智能解读暂时不可用，请稍后再试。'
 }
 
 export async function streamInterpret(context, onDelta, signal) {
@@ -85,9 +98,9 @@ export async function streamInterpret(context, onDelta, signal) {
     body: JSON.stringify({ context })
   })
   if (!res.ok) throw new Error(await errorMessage(res))
-  if (!res.body) throw new Error('AI 解读暂时不可用，请稍后再试。')
+  if (!res.body) throw new Error('智能解读暂时不可用，请稍后再试。')
   if (!(res.headers.get('content-type') || '').includes('text/event-stream')) {
-    throw new Error('AI 解读暂未开放。')
+    throw new Error('智能解读暂未开放。')
   }
 
   const reader = res.body.getReader()

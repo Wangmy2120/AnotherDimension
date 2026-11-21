@@ -6,6 +6,7 @@ import { store, dayInfo, bazi, fortune } from './store.js'
 import { subscribeMotion } from './lib/motion.js'
 import { sound } from './lib/sound.js'
 import { chapterByKey, chapterFromHash, chapters, readingChapters } from './data/chapters.js'
+import { getLiurenLesson } from './lib/liuren.js'
 import HomeView from './views/HomeView.vue'
 import SynthesisView from './views/SynthesisView.vue'
 import CelestialLoader from './components/CelestialLoader.vue'
@@ -21,6 +22,7 @@ const loaders = {
   bazi: () => import('./views/BaziView.vue'),
   gua: () => import('./views/DivinationView.vue'),
   dream: () => import('./views/DreamView.vue'),
+  liuren: () => import('./views/LiurenView.vue'),
   sky: () => import('./views/SkyView.vue'),
   kindred: () => import('./views/KindredView.vue'),
   synthesis: () => Promise.resolve({ default: SynthesisView }),
@@ -48,6 +50,13 @@ const activeTab = computed(() => chapterByKey[active.value] || chapterByKey.home
 const info = computed(() => dayInfo())
 const chart = computed(() => bazi())
 const todayFortune = computed(() => fortune())
+const liurenPreview = computed(() => {
+  const now = new Date()
+  return getLiurenLesson({ dateStr: info.value.dateStr, hour: now.getHours(), minute: now.getMinutes() })
+})
+const currentLiuren = computed(() => (
+  store.liurenSession && store.liurenSession.date === info.value.dateStr ? store.liurenSession : null
+))
 const readingIndex = computed(() => readingChapters.findIndex(chapter => chapter.key === active.value))
 const prevChapter = computed(() => readingIndex.value > 0 ? readingChapters[readingIndex.value - 1] : null)
 const nextChapter = computed(() => readingIndex.value >= 0 ? readingChapters[readingIndex.value + 1] || null : null)
@@ -60,6 +69,9 @@ const chapterMeta = computed(() => ({
   bazi: chart.value ? `${chart.value.dayGan}日主 · ${chart.value.shengXiao}` : '等待录入生辰',
   gua: store.hexSession?.result?.primaryName || '尚未起卦',
   dream: store.dreamSession?.keyword || '尚未记录',
+  liuren: currentLiuren.value
+    ? `${currentLiuren.value.result}落宫 · 月日时三课`
+    : `${liurenPreview.value.result.name}落宫 · 月日时三课`,
   sky: `${info.value.xiuName}值宿 · 今夜观星`,
   kindred: `${info.value.dayGanZhi}日 · ${info.value.xiuName}`,
   synthesis: '历法 · 命盘 · 卦象 · 梦境',
@@ -121,6 +133,18 @@ const activeFacts = computed(() => {
             { label: '梦境', value: '尚未记录' },
             { label: '记录', value: '仅保存在此浏览器' }
           ]
+    case 'liuren':
+      return currentLiuren.value
+        ? [
+            { label: '日期', value: info.value.dateStr },
+            { label: '三课', value: `月课${currentLiuren.value.monthPalace} · 日课${currentLiuren.value.dayPalace} · 时课${currentLiuren.value.hourPalace}` },
+            { label: '落宫', value: `${currentLiuren.value.result} · ${currentLiuren.value.verdict}` }
+          ]
+        : [
+            { label: '日期', value: info.value.dateStr },
+            { label: '课式', value: '月 · 日 · 时三课' },
+            { label: '起时', value: '进入后选择' }
+          ]
     case 'sky':
       return [
         { label: '日期', value: info.value.dateStr },
@@ -173,6 +197,11 @@ function scrollTo(top, immediate = false) {
   } else {
     window.scrollTo({ top, behavior: immediate || reducedMotion() ? 'auto' : 'smooth' })
   }
+}
+
+function handleAppScroll(event) {
+  const top = Number(event.detail?.top)
+  if (Number.isFinite(top)) scrollTo(top, Boolean(event.detail?.immediate))
 }
 
 function documentTitle(chapter) {
@@ -462,6 +491,7 @@ onMounted(async () => {
   setupCardReveal()
   window.addEventListener('keydown', handleIndexKeys)
   window.addEventListener('keydown', handleShortcuts)
+  window.addEventListener('tianji:scroll-to', handleAppScroll)
   window.addEventListener('scroll', handleScrollState, { passive: true })
   window.addEventListener('pointermove', handleMagneticMove, { passive: true })
   window.addEventListener('pointerout', handleMagneticLeave, { passive: true })
@@ -486,6 +516,7 @@ onBeforeUnmount(() => {
   window.clearTimeout(scrollStateTimer)
   window.removeEventListener('keydown', handleIndexKeys)
   window.removeEventListener('keydown', handleShortcuts)
+  window.removeEventListener('tianji:scroll-to', handleAppScroll)
   window.removeEventListener('scroll', handleScrollState)
   window.removeEventListener('pointermove', handleMagneticMove)
   window.removeEventListener('pointerout', handleMagneticLeave)
@@ -513,18 +544,21 @@ onBeforeUnmount(() => {
             <circle cx="32" cy="17.5" r="4" fill="currentColor" />
             <circle cx="32" cy="46.5" r="4" fill="var(--void)" />
           </svg>
-          <span class="brand-copy"><span class="app-title">天机历</span><span class="app-sub">TIANJI CALENDAR</span></span>
+          <span class="brand-copy"><span class="app-title">天机历</span><span class="app-sub">观象 · 知时</span></span>
         </a>
         <div class="hud-actions">
           <button class="hud-button sound-toggle" type="button" :aria-pressed="sound.enabled" :aria-label="sound.enabled ? '关闭交互声音' : '开启交互声音'" @click="sound.toggle()">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4h4l5 4V6L8 10H4Z" /><path v-if="sound.enabled" d="M16 9c1.7 1.7 1.7 4.3 0 6M18.5 6.5c3 3 3 8 0 11" /><path v-else d="m16 9 5 6m0-6-5 6" /></svg>
-            <span>声音 {{ sound.enabled ? '开' : '关' }} <em class="hud-en">SOUND</em></span>
+            <span>声音 {{ sound.enabled ? '开' : '关' }}</span>
           </button>
           <a class="hud-button conclusion-trigger" href="#/synthesis" aria-label="前往合参">
-            <span>合参 <em class="hud-en">SYNTH</em></span>
+            <span>合参</span>
+          </a>
+          <a class="hud-button settings-trigger" href="#/settings" aria-label="打开设置">
+            <span>设置</span>
           </a>
           <button ref="indexTrigger" class="hud-button index-trigger" type="button" aria-haspopup="dialog" :aria-expanded="indexOpen" @click="indexOpen ? closeIndex() : openIndex()">
-            <span>索引 <em class="hud-en">INDEX</em></span><i aria-hidden="true"></i><i aria-hidden="true"></i>
+            <span>索引</span><i aria-hidden="true"></i><i aria-hidden="true"></i>
           </button>
         </div>
       </div>
@@ -565,9 +599,9 @@ onBeforeUnmount(() => {
 
     <Transition name="index-menu">
       <div v-if="indexOpen" class="index-mask" @click.self="closeIndex()">
-        <section ref="indexPanel" class="index-panel" role="dialog" aria-modal="true" aria-label="全站章节索引">
-          <header class="index-head"><span>TIANJI / INDEX</span><button type="button" aria-label="关闭索引" @click="closeIndex()">关闭 ×</button></header>
-          <div class="index-word" aria-hidden="true">INDEX</div>
+        <section ref="indexPanel" class="index-panel" role="dialog" aria-modal="true" aria-label="全站章节索引" data-lenis-prevent>
+          <header class="index-head"><span>天机 / 索引</span><button type="button" aria-label="关闭索引" @click="closeIndex()">关闭 ×</button></header>
+          <div class="index-word" aria-hidden="true">索引</div>
           <nav class="index-list" aria-label="全部章节与偏好">
             <a v-for="(item, index) in indexItems" :key="item.key" class="index-link" :class="{ active: active === item.key }" :style="{ '--i': index }" :href="item.path" :aria-current="active === item.key ? 'page' : undefined" @click="closeIndex(false)">
               <span class="index-number">{{ item.number || '—' }}</span>
@@ -577,7 +611,7 @@ onBeforeUnmount(() => {
             </a>
           </nav>
           <footer class="index-foot">
-            <p class="index-keys"><kbd>←</kbd><kbd>→</kbd>换章 · <kbd>Backspace</kbd>回今日 · <kbd>I</kbd>索引 · <kbd>Esc</kbd>关闭</p>
+            <p class="index-keys"><kbd>←</kbd><kbd>→</kbd>换章 · <kbd>退格</kbd>回今日 · <kbd>索引快捷键</kbd> · <kbd>退出键</kbd>关闭</p>
             <p>观时 · 知位 · 见天地</p>
           </footer>
         </section>

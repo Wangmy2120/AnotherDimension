@@ -437,7 +437,7 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="card">
-        <button class="btn block" @click="askAi">AI 解卦</button>
+        <button class="btn block" @click="askAi">智能解卦</button>
         <p class="muted small storage-note">卦象已记入今日卦簿，同日重问同事不再重摇。</p>
         <p class="card-footnote muted small">动爻取本卦变爻爻辞；无动爻时以本卦卦辞为主。卦爻辞引自《周易》公版原文。</p>
         <p v-if="storageWarning" class="storage-warning" role="status">{{ storageWarning }}</p>

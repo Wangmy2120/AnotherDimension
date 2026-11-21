@@ -77,7 +77,7 @@ function submit() {
   <section class="home-profile" aria-labelledby="profile-title">
     <div class="profile-heading">
       <div>
-        <span class="profile-code">今日 / ORIGIN</span>
+        <span class="profile-code">今日 / 起源</span>
         <h2 id="profile-title">校准你的时空</h2>
         <p>位置与生辰，在同一屏完成校准；资料仅保存在此浏览器。</p>
       </div>
@@ -93,9 +93,9 @@ function submit() {
       <TimeCompass />
       <form class="birth-panel" novalidate @submit.prevent="submit">
         <div class="birth-heading">
-          <span class="profile-code">生辰 / BIRTH ARCHIVE · LOCAL</span>
+          <span class="profile-code">生辰 / 本地档案</span>
           <h3>录入生辰</h3>
-          <p>资料仅保存在此浏览器，只有主动生成 AI 解读时才会使用。</p>
+          <p>资料仅保存在此浏览器，只有主动生成智能解读时才会使用。</p>
         </div>
 
         <div class="calendar-choice" role="radiogroup" aria-label="历法">

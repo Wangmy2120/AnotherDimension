@@ -184,7 +184,9 @@ function goChapter(index) {
   const top = track.value.getBoundingClientRect().top + window.scrollY - headerHeight
   const travel = Math.max(0, track.value.offsetHeight - (stage.value?.clientHeight || window.innerHeight))
   const ratio = index === ITEM_COUNT - 1 ? 1 : (index + 0.08) / (ITEM_COUNT - 1)
-  window.scrollTo({ top: top + travel * ratio, behavior: reducedMotion.value ? 'auto' : 'smooth' })
+  window.dispatchEvent(new CustomEvent('tianji:scroll-to', {
+    detail: { top: top + travel * ratio, immediate: reducedMotion.value }
+  }))
 }
 
 function resizeInkCanvas() {
@@ -966,7 +968,7 @@ onBeforeUnmount(() => {
     <template v-if="!staticMode">
       <div class="journey-intro">
         <div class="intro-inner">
-          <p>星轨 / CELESTIAL INDEX · {{ String(items.length).padStart(2, '0') }}</p>
+          <p>星轨 / 天象索引 · {{ String(items.length).padStart(2, '0') }}</p>
           <h2 id="journey-title">七章命轨，<br>皆为你所行。</h2>
           <span>向下滚动，沿银墨螺旋逐章靠近。当前章节停驻于中心，点选卡片即可抵达。</span>
           <i aria-hidden="true"></i>
@@ -1020,7 +1022,7 @@ onBeforeUnmount(() => {
             >
               <span class="chapter-card-top">
                 <span class="chapter-code">{{ item.chapter }}</span>
-                <span class="chapter-station"><i aria-hidden="true"></i>STATION / {{ String(index + 1).padStart(2, '0') }}</span>
+                <span class="chapter-station"><i aria-hidden="true"></i>星站 / {{ String(index + 1).padStart(2, '0') }}</span>
               </span>
               <ChapterInstrument :type="item.key" :data="item.instrument" :active="index === activeIndex" />
               <span class="chapter-body">
@@ -1063,7 +1065,7 @@ onBeforeUnmount(() => {
           </nav>
 
           <div class="journey-progress">
-            <span class="progress-label">星轨 / STAR RAIL</span>
+            <span class="progress-label">星轨 / 观象</span>
             <div class="progress-track" role="progressbar" aria-label="星轨滚动进度" aria-valuemin="0" aria-valuemax="100" :aria-valuenow="progressPercent"><i :style="{ transform: `scaleX(${progress})` }"></i></div>
             <span class="progress-count">{{ String(activeIndex + 1).padStart(2, '0') }} — {{ String(ITEM_COUNT).padStart(2, '0') }}</span>
           </div>
@@ -1074,9 +1076,9 @@ onBeforeUnmount(() => {
 
     <div v-else class="static-journey">
       <header class="static-heading">
-        <p>星轨 / CELESTIAL INDEX · {{ String(items.length).padStart(2, '0') }}</p>
+        <p>星轨 / 天象索引 · {{ String(items.length).padStart(2, '0') }}</p>
         <h2 id="journey-title">七章星轨</h2>
-        <span>{{ webglFailed ? 'WebGL 暂不可用，星图已静态展开。' : '已依减少动态效果偏好静态展开。' }}</span>
+        <span>{{ webglFailed ? '图形加速暂不可用，星图已静态展开。' : '已依减少动态效果偏好静态展开。' }}</span>
       </header>
       <div class="static-grid">
         <a
@@ -1089,7 +1091,7 @@ onBeforeUnmount(() => {
         >
           <span class="chapter-card-top">
             <span class="chapter-code">{{ item.chapter }}</span>
-            <span class="chapter-station"><i aria-hidden="true"></i>STATION / {{ String(index + 1).padStart(2, '0') }}</span>
+            <span class="chapter-station"><i aria-hidden="true"></i>星站 / {{ String(index + 1).padStart(2, '0') }}</span>
           </span>
           <ChapterInstrument :type="item.key" :data="item.instrument" :active="false" />
           <span class="chapter-body">

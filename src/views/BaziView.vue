@@ -105,7 +105,7 @@ function shichen(h) {
         <button class="btn" @click="submit">排盘</button>
         <button v-if="store.profile" class="btn ghost" @click="clearProfile">清除生辰</button>
       </div>
-      <p class="muted small" style="margin-top: 10px">生辰仅保存在你的浏览器本地，不会上传服务器（AI 解读时除外）。</p>
+      <p class="muted small" style="margin-top: 10px">生辰仅保存在你的浏览器本地，不会上传服务器（智能解读时除外）。</p>
     </div>
 
     <template v-if="chart">
@@ -131,7 +131,7 @@ function shichen(h) {
           <div class="kv"><span class="k">胎元/命宫</span><span>{{ chart.taiYuan }} / {{ chart.mingGong }}（身宫 {{ chart.shenGong }}）</span></div>
           <div class="kv"><span class="k">日柱旬空</span><span>{{ chart.xunKong }}</span></div>
         </div>
-        <p class="card-footnote muted small">十神、四柱与命宫参《渊海子平》体例；排盘由 lunar-typescript 推算。</p>
+        <p class="card-footnote muted small">十神、四柱与命宫参《渊海子平》体例；排盘由开源农历库推算。</p>
       </div>
 
       <div class="card">

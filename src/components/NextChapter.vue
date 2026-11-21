@@ -15,7 +15,7 @@ const next = computed(() => {
 
 <template>
   <nav v-if="next" class="next-chapter" aria-label="下一章">
-    <span class="next-kicker">NEXT CHAPTER / {{ next.number || '—' }}</span>
+    <span class="next-kicker">下一章 / {{ next.number || '—' }}</span>
     <a :href="next.path" :aria-label="`下一章：${next.label}，${next.title}`">
       <span>下一章</span>
       <strong>{{ next.label }}</strong>

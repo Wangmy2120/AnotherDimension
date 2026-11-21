@@ -2,7 +2,7 @@ export const chapters = [
   {
     key: 'home',
     label: '今日',
-    code: 'ORIGIN',
+    code: '起源',
     title: '观天象，定此刻',
     path: '#/',
     number: null,
@@ -12,7 +12,7 @@ export const chapters = [
   {
     key: 'almanac',
     label: '黄历',
-    code: 'ALMANAC',
+    code: '历法',
     title: '因时而行',
     path: '#/almanac',
     number: '01',
@@ -22,7 +22,7 @@ export const chapters = [
   {
     key: 'zeji',
     label: '择吉',
-    code: 'SELECTION',
+    code: '择时',
     title: '择事候时',
     path: '#/zeji',
     number: '02',
@@ -32,7 +32,7 @@ export const chapters = [
   {
     key: 'fortune',
     label: '运势',
-    code: 'TENDENCY',
+    code: '趋势',
     title: '观势知止',
     path: '#/fortune',
     number: '03',
@@ -42,7 +42,7 @@ export const chapters = [
   {
     key: 'bazi',
     label: '八字',
-    code: 'NATAL',
+    code: '命理',
     title: '由命见性',
     path: '#/bazi',
     number: '04',
@@ -52,7 +52,7 @@ export const chapters = [
   {
     key: 'gua',
     label: '摇卦',
-    code: 'DIVINATION',
+    code: '易卦',
     title: '以问观变',
     path: '#/gua',
     number: '05',
@@ -62,7 +62,7 @@ export const chapters = [
   {
     key: 'dream',
     label: '解梦',
-    code: 'ONEIRIC',
+    code: '梦象',
     title: '循梦观心',
     path: '#/dream',
     number: '06',
@@ -70,39 +70,49 @@ export const chapters = [
     intro: true
   },
   {
+    key: 'liuren',
+    label: '小六壬',
+    code: '起课',
+    title: '按时起课',
+    path: '#/liuren',
+    number: '07',
+    group: 'chapter',
+    intro: true
+  },
+  {
     key: 'sky',
     label: '观星',
-    code: 'CELESTIAL',
+    code: '观象',
     title: '仰见星辰',
     path: '#/sky',
-    number: '07',
+    number: '08',
     group: 'chapter',
     intro: true
   },
   {
     key: 'kindred',
     label: '同象',
-    code: 'KINDRED',
+    code: '同异',
     title: '异世同象',
     path: '#/kindred',
-    number: '08',
+    number: '09',
     group: 'chapter',
     intro: true
   },
   {
     key: 'synthesis',
     label: '合参',
-    code: 'SYNTHESIS',
+    code: '总览',
     title: '万轨归一',
     path: '#/synthesis',
-    number: '09',
+    number: '10',
     group: 'conclusion',
     intro: false
   },
   {
     key: 'settings',
     label: '设置',
-    code: 'UTILITY',
+    code: '偏好',
     title: '偏好与隐私',
     path: '#/settings',
     number: null,
@@ -113,11 +123,10 @@ export const chapters = [
 
 // Future modules stay out of navigation until a view and loader are registered here.
 export const futureChapters = [
-  { key: 'folk-knowledge', label: '民俗', code: 'FOLKLORE', title: '知其所以然', path: '#/folk', group: 'future', enabled: false },
-  { key: 'xiaoliuren', label: '小六壬', code: 'XIAOLIUREN', title: '按时起课', path: '#/xiaoliuren', group: 'future', enabled: false },
-  { key: 'ziwei', label: '紫微斗数', code: 'ZIWEI', title: '观命于星', path: '#/ziwei', group: 'future', enabled: false },
-  { key: 'xiu', label: '星宿', code: 'MANSIONS', title: '循天列宿', path: '#/mansions', group: 'future', enabled: false },
-  { key: 'cezi', label: '测字', code: 'GLYPH', title: '一字见心', path: '#/cezi', group: 'future', enabled: false }
+  { key: 'folk-knowledge', label: '民俗', code: '民俗', title: '知其所以然', path: '#/folk', group: 'future', enabled: false },
+  { key: 'ziwei', label: '紫微斗数', code: '斗数', title: '观命于星', path: '#/ziwei', group: 'future', enabled: false },
+  { key: 'xiu', label: '星宿', code: '星宿', title: '循天列宿', path: '#/mansions', group: 'future', enabled: false },
+  { key: 'cezi', label: '测字', code: '测字', title: '一字见心', path: '#/cezi', group: 'future', enabled: false }
 ]
 
 export const chapterByKey = Object.fromEntries(chapters.map(chapter => [chapter.key, chapter]))

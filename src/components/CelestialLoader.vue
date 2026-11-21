@@ -1,5 +1,5 @@
 <script setup>
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { subscribeMotion } from '../lib/motion.js'
 
 const props = defineProps({ ready: { type: Boolean, default: false } })
@@ -8,6 +8,19 @@ const emit = defineEmits(['finished'])
 const canvas = ref(null)
 const complete = ref(false)
 const percent = ref(0)
+const FINANCIAL_DIGITS = ['零', '壹', '贰', '叁', '肆', '伍', '陆', '柒', '捌', '玖']
+
+function toFinancialNumeral(value) {
+  const number = Math.max(0, Math.min(100, Math.round(value)))
+  if (number === 0) return '零'
+  if (number === 100) return '壹佰'
+  if (number < 10) return FINANCIAL_DIGITS[number]
+  const tens = Math.floor(number / 10)
+  const ones = number % 10
+  return `${tens === 1 ? '拾' : `${FINANCIAL_DIGITS[tens]}拾`}${ones ? FINANCIAL_DIGITS[ones] : ''}`
+}
+
+const percentText = computed(() => toFinancialNumeral(percent.value))
 
 let context
 let particles = []
@@ -304,7 +317,7 @@ onBeforeUnmount(() => {
     class="celestial-loader"
     :class="{ 'loader--complete': complete }"
     role="status"
-    :aria-label="`页面加载中 ${percent}%`"
+    :aria-label="`页面加载中，百分之${percentText}`"
   >
     <div class="loader-content">
       <div class="loader-instrument">
@@ -315,7 +328,7 @@ onBeforeUnmount(() => {
           <circle cx="50" cy="27" r="3" /><circle cx="50" cy="73" r="3" />
         </svg>
       </div>
-      <div class="loader-percent" aria-hidden="true"><span>{{ String(percent).padStart(3, '0') }}</span><small>%</small></div>
+      <div class="loader-percent" aria-hidden="true"><small class="loader-percent-label">百分之</small><span class="loader-numeral">{{ percentText }}</span></div>
       <p class="loader-motto" aria-hidden="true"><span v-for="(character, index) in '观时 · 知位 · 见天地'" :key="index" :style="{ '--char': index }">{{ character === ' ' ? ' ' : character }}</span></p>
     </div>
   </div>
@@ -327,15 +340,15 @@ onBeforeUnmount(() => {
 .loader-instrument { position: relative; width: min(64vw, 310px); aspect-ratio: 1; }
 .loader-canvas { display: block; width: 100%; height: 100%; filter: drop-shadow(0 0 32px rgba(255, 255, 255, 0.06)); }
 .taiji-seal { position: absolute; inset: 19%; width: 62%; height: 62%; fill: none; stroke: oklch(0.97 0 0 / 0.28); stroke-width: 0.65; stroke-dasharray: 310; stroke-dashoffset: 310; animation: seal-draw 1.4s 0.2s ease forwards; }
-.loader-percent { position: absolute; right: 0; bottom: 4%; display: flex; align-items: flex-start; color: var(--glow); font-variant-numeric: tabular-nums; line-height: 0.8; }
-.loader-percent > span { font-family: 'DM Sans', sans-serif; font-size: clamp(70px, 12vw, 142px); font-weight: 200; letter-spacing: -0.08em; }
-.loader-percent small { margin: 4px 0 0 12px; color: var(--silver); font-size: 12px; letter-spacing: 0.1em; }
+.loader-percent { position: absolute; right: 0; bottom: 4%; display: flex; align-items: flex-end; flex-direction: column; gap: 3px; color: var(--glow); line-height: 0.9; }
+.loader-numeral { font-family: 'Noto Serif SC', 'Songti SC', 'STSong', serif; font-size: clamp(48px, 7.2vw, 92px); font-weight: 400; letter-spacing: 0.03em; line-height: 1; white-space: nowrap; }
+.loader-percent-label { margin-right: 2px; color: var(--silver); font-family: 'Noto Serif SC', 'Songti SC', 'STSong', serif; font-size: 11px; letter-spacing: 0.24em; line-height: 1; }
 .loader-motto { position: absolute; bottom: 0; left: 0; display: flex; color: var(--silver); font-family: 'Noto Serif SC', 'Songti SC', serif; font-size: 12px; letter-spacing: 0.18em; white-space: nowrap; }
 .loader-motto span { display: inline-block; opacity: 0; transform: translateY(12px); animation: character-in 480ms ease forwards; animation-delay: calc(280ms + var(--char) * 55ms); }
 .loader--complete { clip-path: inset(0 0 100% 0); pointer-events: none; }
 .loader--complete .loader-content { opacity: 0; transform: translateY(-30px) scale(1.06); }
 @keyframes seal-draw { to { stroke-dashoffset: 0; } }
 @keyframes character-in { to { opacity: 1; transform: translateY(0); } }
-@media (max-width: 600px) { .loader-content { width: 86vw; } .loader-percent { right: 4px; bottom: 12%; } .loader-motto { bottom: 2%; } }
+@media (max-width: 600px) { .loader-content { width: 86vw; } .loader-percent { right: 4px; bottom: 12%; } .loader-numeral { font-size: clamp(42px, 10vw, 58px); } .loader-percent-label { font-size: 10px; } .loader-motto { bottom: 2%; } }
 @media (prefers-reduced-motion: reduce) { .celestial-loader, .loader-content { transition: none; } .taiji-seal { stroke-dashoffset: 0; animation: none; } .loader-motto span { opacity: 1; transform: none; animation: none; } }
 </style>

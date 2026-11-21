@@ -149,7 +149,7 @@ onBeforeUnmount(() => {
       <p v-if="!ft.personalized" class="muted small" style="margin-top: 10px">
         当前为通用运势。到「八字」页录入生辰后，将按你的日主五行个性化推演。
       </p>
-      <button class="btn block" style="margin-top: 14px" @click="openAi('daily')">AI 深度解读</button>
+      <button class="btn block" style="margin-top: 14px" @click="openAi('daily')">智能深度解读</button>
     </div>
   </div>
 </template>

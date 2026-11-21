@@ -107,6 +107,30 @@ const skyDots = computed(() => {
 })
 
 /** 亮缘画半圈，再用长短轴随照明度收放的弧补出明暗界线；两弧同起终点即成月相轮廓。 */
+const liurenNodes = computed(() => {
+  const names = ['大安', '留连', '速喜', '赤口', '小吉', '空亡']
+  const steps = Array.isArray(props.data?.steps) ? props.data.steps : []
+  return names.map((name, index) => {
+    const angle = -Math.PI / 2 + index / 6 * Math.PI * 2
+    return {
+      name,
+      index,
+      x: 120 + Math.cos(angle) * 47,
+      y: 82 + Math.sin(angle) * 47,
+      step: steps.includes(index),
+      active: index === Number(props.data?.resultIndex)
+    }
+  })
+})
+
+const liurenTrace = computed(() => {
+  const steps = Array.isArray(props.data?.steps) ? props.data.steps : []
+  return steps.map(index => {
+    const angle = -Math.PI / 2 + index / 6 * Math.PI * 2
+    return `${(120 + Math.cos(angle) * 47).toFixed(1)},${(82 + Math.sin(angle) * 47).toFixed(1)}`
+  }).join(' ')
+})
+
 const skyMoon = computed(() => {
   const illumination = Math.max(0.02, Math.min(0.98, Number(props.data?.illumination) || 0))
   const radius = 15
@@ -125,7 +149,7 @@ const skyMoon = computed(() => {
 <template>
   <span class="chapter-instrument" :class="[`instrument-${type}`, { 'is-active': active }]" aria-hidden="true">
     <svg v-if="type === 'almanac'" viewBox="0 0 240 150" focusable="false">
-      <g class="instrument-caption"><text x="8" y="16">二十八宿 / XIU</text><text x="150" y="16">宜 · 忌</text></g>
+      <g class="instrument-caption"><text x="8" y="16">二十八宿 / 列宿</text><text x="150" y="16">宜 · 忌</text></g>
       <circle cx="70" cy="75" r="48" class="orbit" />
       <circle cx="70" cy="75" r="39" class="orbit faint" />
       <line v-for="tick in xiuTicks" :key="tick.index" :x1="tick.x1" :y1="tick.y1" :x2="tick.x2" :y2="tick.y2" class="tick" :class="{ lit: tick.active }" />
@@ -141,7 +165,7 @@ const skyMoon = computed(() => {
     </svg>
 
     <svg v-else-if="type === 'zeji'" viewBox="0 0 240 150" focusable="false">
-      <g class="instrument-caption"><text x="8" y="16">三十日 / DENSITY</text><text x="190" y="16">今</text></g>
+      <g class="instrument-caption"><text x="8" y="16">三十日 / 疏密</text><text x="190" y="16">今</text></g>
       <line x1="10" y1="122" x2="230" y2="122" class="hairline" />
       <g v-for="(bar, index) in zejiBars" :key="index">
         <rect :x="bar.x" :y="122 - bar.height" width="4" :height="bar.height" class="bar" :class="{ today: bar.today }" />
@@ -152,7 +176,7 @@ const skyMoon = computed(() => {
     </svg>
 
     <svg v-else-if="type === 'fortune'" viewBox="0 0 240 150" focusable="false">
-      <g class="instrument-caption"><text x="8" y="16">四象 / TENDENCY</text></g>
+      <g class="instrument-caption"><text x="8" y="16">四象 / 强弱</text></g>
       <polygon points="120,29 169,75 120,121 71,75" class="orbit faint" />
       <polygon points="120,48 145,75 120,102 95,75" class="orbit faint" />
       <g v-for="axis in fortuneAxes" :key="axis.name">
@@ -179,7 +203,7 @@ const skyMoon = computed(() => {
     </svg>
 
     <svg v-else-if="type === 'gua'" viewBox="0 0 240 150" focusable="false">
-      <g class="instrument-caption"><text x="8" y="16">六爻 / HEXAGRAM</text></g>
+      <g class="instrument-caption"><text x="8" y="16">六爻 / 卦象</text></g>
       <text x="220" y="16" text-anchor="end">{{ data.movingCount ? '动' : '静' }}</text>
       <g v-for="(line, index) in rawLines" :key="index">
         <template v-if="line.yang">
@@ -194,7 +218,7 @@ const skyMoon = computed(() => {
     </svg>
 
     <svg v-else-if="type === 'dream'" viewBox="0 0 240 150" focusable="false">
-      <g class="instrument-caption"><text x="8" y="16">梦象 / ONEIRIC</text></g>
+      <g class="instrument-caption"><text x="8" y="16">梦象 / 梦意</text></g>
       <path d="M30 111C76 95 49 46 103 42c43-3 33 55 83 31 21-10 27 13 38 22" class="ink-thread" />
       <g v-for="(star, index) in dreamStars" :key="index">
         <line v-if="star.lineTo" :x1="star.x" :y1="star.y" :x2="star.lineTo.x" :y2="star.lineTo.y" class="hairline faint" />
@@ -204,8 +228,20 @@ const skyMoon = computed(() => {
       <text x="119" y="86" text-anchor="middle" class="keyword">{{ dreamKeyword }}</text>
     </svg>
 
+    <svg v-else-if="type === 'liuren'" viewBox="0 0 240 150" focusable="false">
+      <g class="instrument-caption"><text x="8" y="16">六壬 / 三课</text><text x="220" y="16" text-anchor="end">{{ data.resultName || '时课' }}</text></g>
+      <circle cx="120" cy="82" r="58" class="orbit faint" />
+      <circle cx="120" cy="82" r="38" class="orbit faint" />
+      <polyline :points="liurenTrace" class="liuren-trace" />
+      <g v-for="node in liurenNodes" :key="node.name" :transform="`translate(${node.x} ${node.y})`">
+        <circle r="13" class="liuren-node" :class="{ 'is-result': node.active, 'is-step': node.step }" />
+        <text y="3" text-anchor="middle" class="liuren-node-label">{{ node.name }}</text>
+      </g>
+      <text x="120" y="86" text-anchor="middle" class="keyword">{{ data.resultName || '课' }}</text>
+    </svg>
+
     <svg v-else-if="type === 'sky'" viewBox="0 0 240 150" focusable="false">
-      <g class="instrument-caption"><text x="8" y="16">星盘 / SKY</text><text x="150" y="16">暗夜 {{ data.score ?? '—' }}</text></g>
+      <g class="instrument-caption"><text x="8" y="16">星盘 / 星象</text><text x="150" y="16">暗夜 {{ data.score ?? '—' }}</text></g>
       <circle cx="70" cy="82" r="50" class="orbit" />
       <circle cx="70" cy="82" r="33" class="orbit faint" />
       <circle cx="70" cy="82" r="17" class="orbit faint" />
@@ -274,6 +310,11 @@ const skyMoon = computed(() => {
 .planet-dot { fill: var(--glow); filter: drop-shadow(0 0 4px oklch(0.97 0 0 / 0.55)); }
 .moon-limb { fill: none; stroke: var(--glow); stroke-width: 1.1; }
 .moon-terminator { fill: none; stroke: oklch(0.97 0 0 / 0.5); stroke-width: 0.9; }
+.liuren-node { fill: var(--void); stroke: oklch(0.97 0 0 / 0.24); stroke-width: 0.8; }
+.liuren-node.is-step { stroke: var(--silver); }
+.liuren-node.is-result { fill: oklch(0.97 0 0 / 0.14); stroke: var(--glow); }
+.liuren-node-label { fill: var(--silver); font-family: 'Noto Serif SC', 'Songti SC', serif; font-size: 8px; letter-spacing: 0.02em; }
+.liuren-trace { fill: none; stroke: oklch(0.97 0 0 / 0.34); stroke-width: 0.8; stroke-dasharray: 2 3; }
 .chapter-card.active .chapter-instrument,
 .static-card .chapter-instrument { top: 104px; right: 20px; bottom: auto; width: min(34%, 200px); opacity: 0.58; }
 .chapter-card:not(.active):not(.static-card) .chapter-instrument { top: 78px; right: auto; bottom: auto; left: 50%; width: min(62%, 230px); opacity: 0.14; transform: translateX(-50%); }

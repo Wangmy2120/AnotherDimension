@@ -47,8 +47,8 @@ const localClock = computed(() => now.value.toLocaleTimeString('zh-CN', { hour12
 const solarClock = computed(() => formatSolarTime(getTrueSolarTime(now.value, location.longitude)))
 const sourceLabel = computed(() => ({ default: '默认位置 · 北京', gps: '浏览器定位', manual: '手动位置' })[location.source])
 const coordinateText = computed(() => {
-  const lat = `${Math.abs(location.latitude).toFixed(4)}°${location.latitude >= 0 ? 'N' : 'S'}`
-  const lon = `${Math.abs(location.longitude).toFixed(4)}°${location.longitude >= 0 ? 'E' : 'W'}`
+  const lat = `${location.latitude >= 0 ? '北纬' : '南纬'} ${Math.abs(location.latitude).toFixed(4)}°`
+  const lon = `${location.longitude >= 0 ? '东经' : '西经'} ${Math.abs(location.longitude).toFixed(4)}°`
   return `${lat} · ${lon}`
 })
 
@@ -280,7 +280,7 @@ onBeforeUnmount(() => window.clearInterval(timer))
       <div class="kv"><span class="k">昏影</span><span>日落 {{ formatClock(forecast.sunset) }} → 天文黑天 {{ formatClock(forecast.darkStart) }}；黑天尽于 {{ formatClock(forecast.darkEnd) }}，日出 {{ formatClock(forecast.sunrise) }}</span></div>
       <div class="kv"><span class="k">月况</span><span>{{ moon.phaseName }} · 照明 {{ Math.round(moon.illumination * 100) }}% · {{ moon.elevation > 0 ? `天上 ${moon.elevation.toFixed(0)}°` : '地平线下' }}</span></div>
       <div class="kv"><span class="k">位置</span><span>{{ sourceLabel }} · {{ coordinateText }}</span></div>
-      <button class="btn block ai-trigger" type="button" @click="openSkyReading">AI 观星解读</button>
+      <button class="btn block ai-trigger" type="button" @click="openSkyReading">智能观星解读</button>
     </section>
 
     <section class="card moon-card" aria-labelledby="moon-title">
@@ -297,7 +297,7 @@ onBeforeUnmount(() => window.clearInterval(timer))
           <div class="grid2">
             <div class="kv"><span class="k">照明</span><span>{{ (moon.illumination * 100).toFixed(1) }}%</span></div>
             <div class="kv"><span class="k">距日</span><span>{{ moon.elongation.toFixed(1) }}°</span></div>
-            <div class="kv"><span class="k">地月距离</span><span>{{ moon.distance.toFixed(0) }} km</span></div>
+            <div class="kv"><span class="k">地月距离</span><span>{{ moon.distance.toFixed(0) }} 千米</span></div>
             <div class="kv"><span class="k">视差</span><span>{{ (moon.parallax * 3600).toFixed(0) }}″</span></div>
             <div class="kv"><span class="k">地平</span><span>{{ describePosition(moon) }}</span></div>
             <div class="kv"><span class="k">黄道经</span><span>{{ moon.eclipticLongitude.toFixed(1) }}°</span></div>
@@ -332,7 +332,7 @@ onBeforeUnmount(() => window.clearInterval(timer))
       <div v-for="planet in planets" :key="planet.key" class="body-row">
         <div class="body-main">
           <strong>{{ planet.name }}</strong>
-          <span class="muted small">{{ planet.magnitude.toFixed(1) }} 等 · 距日 {{ planet.elongation.toFixed(0) }}° · 地距 {{ planet.earthDistance.toFixed(2) }} AU</span>
+          <span class="muted small">{{ planet.magnitude.toFixed(1) }} 等 · 距日 {{ planet.elongation.toFixed(0) }}° · 地距 {{ planet.earthDistance.toFixed(2) }} 天文单位</span>
         </div>
         <div class="body-state" :class="{ 'is-up': planet.elevation > 0 }">
           <span class="tabular">{{ planet.elevation.toFixed(1) }}°</span>
@@ -350,12 +350,12 @@ onBeforeUnmount(() => window.clearInterval(timer))
       <div class="star-grid">
         <div v-for="star in stars" :key="star.name" class="star-cell" :class="{ 'is-down': !star.up }">
           <span class="star-name-cell">{{ star.name }}</span>
-          <span class="muted small">{{ star.en }} · {{ star.mansion ? `${star.mansion}宿` : star.symbol }}</span>
+          <span class="muted small">{{ star.asterism || star.symbol }} · {{ star.mansion ? `${star.mansion}宿` : star.symbol }}</span>
           <span class="star-alt tabular">{{ star.elevation > -0.5 ? `${star.elevation.toFixed(0)}°` : '线下' }}</span>
           <span class="muted small">{{ star.direction }} · {{ star.magnitude.toFixed(2) }} 等</span>
         </div>
       </div>
-      <p class="card-footnote muted small">星表取 J2000 视位置，按总岁差平移到当日；中西星名与现代拜耳名并列，二十八宿归属仅作文化索引。</p>
+      <p class="card-footnote muted small">星表取公元 2000 年历元视位置，按总岁差平移到当日；星名与二十八宿归属并列，仅作文化索引。</p>
     </section>
 
     <section class="card" aria-labelledby="location-title">

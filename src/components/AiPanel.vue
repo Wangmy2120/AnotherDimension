@@ -2,8 +2,9 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { store, dayInfo, bazi, fortune } from '../store.js'
 import { buildContext, streamInterpret } from '../lib/ai.js'
+import AiReadingGuide from './AiReadingGuide.vue'
 
-const SECTION_TITLES = ['今天的状态', '适合去做', '先缓一缓', '给你的提醒', '它在提醒你']
+const SECTION_TITLES = ['今天的状态', '适合去做', '先缓一缓', '给你的提醒', '它在提醒你', '所问之事', '课象说明', '可以怎么做', '需要注意']
 const SECTION_PATTERN = new RegExp(`^[\\s#*【\\[]*(${SECTION_TITLES.join('|')})[\\s】\\]*]*(?:[：:]\\s*([\\s\\S]*))?$`)
 
 function parseSections(value) {
@@ -70,6 +71,14 @@ const sourceItems = computed(() => {
       source: '数据由本机近似天文算法推算，仅随星象与所在城市级坐标发送，不含生辰资料'
     })
   }
+  if (store.aiContextKind === 'liuren' && store.liurenSession) {
+    const liuren = store.liurenSession
+    items.push({
+      label: '六壬课',
+      text: `所问：${liuren.question || '此刻整体'}；月课${liuren.monthPalace}，日课${liuren.dayPalace}，时课${liuren.hourPalace}；落宫${liuren.result}，属${liuren.element}。`,
+      source: '小六壬月日时三课'
+    })
+  }
   return items
 })
 
@@ -101,12 +110,21 @@ watch(() => store.aiOpen, async open => {
   if (store.aiContextKind === 'dream' && store.dreamSession) {
     ctx.dream = store.dreamSession
   }
+  if (store.aiContextKind === 'liuren') {
+    if (!store.liurenSession) {
+      error.value = '尚未起课，请先在六壬课盘落课。'
+      loading.value = false
+      return
+    }
+    ctx.liuren = store.liurenSession
+    ctx.focus = 'liuren'
+  }
   loading.value = true
   controller = new AbortController()
   try {
     await streamInterpret(buildContext(ctx), d => { text.value += d }, controller.signal)
   } catch (e) {
-    if (e.name !== 'AbortError') error.value = e.message || 'AI 解读暂时不可用，请稍后再试。'
+    if (e.name !== 'AbortError') error.value = e.message || '智能解读暂时不可用，请稍后再试。'
   } finally {
     loading.value = false
   }
@@ -150,11 +168,14 @@ onBeforeUnmount(() => {
   <div v-if="store.aiOpen" class="modal-mask" @click.self="close">
     <div ref="dialog" class="modal" role="dialog" aria-modal="true" aria-labelledby="ai-dialog-title">
       <div class="modal-head">
-        <h3 id="ai-dialog-title">{{ { hexagram: '卦象解读', dream: '梦境解读', sky: '观星解读' }[store.aiContextKind] || '今日解读' }}</h3>
+        <h3 id="ai-dialog-title">{{ { hexagram: '卦象解读', dream: '梦境解读', sky: '观星解读', liuren: '课象解读' }[store.aiContextKind] || '今日解读' }}</h3>
         <button ref="closeButton" class="modal-close" type="button" aria-label="关闭解读" @click="close">✕</button>
       </div>
-      <div class="modal-body">
-        <p v-if="error" class="muted" style="color: var(--cinnabar); line-height: 1.8">{{ error }}</p>
+      <div class="modal-body" data-lenis-prevent>
+        <p v-if="error" class="muted" style="color: var(--cinnabar); line-height: 1.8">
+          {{ error }}
+          <a v-if="error.includes('暂未开放')" class="ai-config-link" href="#/settings" @click="close">去设置智能解读</a>
+        </p>
         <div v-else class="ai-text" :class="{ 'ai-cursor': loading }">
           <template v-if="blocks.length">
             <section v-for="(block, index) in blocks" :key="index" class="ai-block">
@@ -164,13 +185,14 @@ onBeforeUnmount(() => {
           </template>
           <template v-else>正在凝神推演……</template>
         </div>
+        <AiReadingGuide v-if="text && !error" />
         <details v-if="sourceItems.length" class="modal-sources">
           <summary>原文依据</summary>
           <ul>
             <li v-for="item in sourceItems" :key="item.label"><strong>{{ item.label }}</strong>{{ item.text }}<small>{{ item.source }}</small></li>
           </ul>
         </details>
-        <p class="muted small" style="margin-top: 14px">AI 生成内容仅供娱乐参考</p>
+        <p class="muted small" style="margin-top: 14px">智能生成内容仅供娱乐参考</p>
       </div>
     </div>
   </div>
@@ -180,6 +202,7 @@ onBeforeUnmount(() => {
 .ai-block + .ai-block { margin-top: 18px; }
 .ai-block h4 { margin-bottom: 7px; color: var(--glow); font-family: 'Noto Serif SC', 'Songti SC', 'STSong', serif; font-size: 14px; font-weight: 400; letter-spacing: 0.16em; }
 .ai-block p { color: var(--silver); white-space: pre-wrap; }
+.ai-config-link { margin-left: 4px; color: var(--glow); text-decoration: underline; text-underline-offset: 4px; }
 .modal-sources { margin-top: 24px; border-top: 1px solid var(--line); }
 .modal-sources summary { display: flex; min-height: 44px; align-items: center; color: var(--silver); cursor: pointer; font-size: 12px; letter-spacing: 0.1em; }
 .modal-sources summary::before { margin-right: 8px; color: var(--muted); content: '+'; }

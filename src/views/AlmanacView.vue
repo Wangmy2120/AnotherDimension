@@ -62,7 +62,7 @@ const info = computed(() => dayInfo())
           <span class="hour-god">{{ time.tianShen }} <b>{{ time.luck }}</b></span>
         </div>
       </div>
-      <p class="card-footnote muted small">建除、胎神与时辰宜忌参《协纪辨方书》体例；历法数据由 lunar-typescript 推算。仅供传统文化体验。</p>
+      <p class="card-footnote muted small">建除、胎神与时辰宜忌参《协纪辨方书》体例；历法数据由开源农历库推算。仅供传统文化体验。</p>
     </section>
 
     <section class="card" aria-labelledby="gods-title">

@@ -4,6 +4,7 @@ import { getFortune } from './lib/fortune.js'
 import { buildResult } from './lib/hexagram.js'
 
 const PROFILE_KEY = 'tianji.profile'
+export const LIUREN_KEY = 'tianji.liuren.latest'
 
 try {
   localStorage.removeItem('tianji.settings')
@@ -37,6 +38,16 @@ function loadDreamSession() {
   }
 }
 
+function loadLiurenSession() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(LIUREN_KEY))
+    if (!saved?.result || saved.date !== todayStr()) return null
+    return saved
+  } catch {
+    return null
+  }
+}
+
 export const store = reactive({
   dateStr: todayStr(),
   profile: loadProfile(),
@@ -46,6 +57,7 @@ export const store = reactive({
   hexSession: loadHexSession(),
   dreamSession: loadDreamSession(),
   skySession: null,
+  liurenSession: loadLiurenSession(),
   tabRequest: null
 })
 

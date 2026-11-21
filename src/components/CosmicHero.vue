@@ -19,9 +19,9 @@ const position = computed(() => getSolarPosition(now.value, store.location.latit
 const localTime = computed(() => now.value.toLocaleTimeString('zh-CN', { hour12: false }))
 const coordinateText = computed(() => {
   const { latitude, longitude } = store.location
-  return `${Math.abs(latitude).toFixed(3)}°${latitude >= 0 ? 'N' : 'S'}  ${Math.abs(longitude).toFixed(3)}°${longitude >= 0 ? 'E' : 'W'}`
+  return `${latitude >= 0 ? '北纬' : '南纬'} ${Math.abs(latitude).toFixed(3)}°  ${longitude >= 0 ? '东经' : '西经'} ${Math.abs(longitude).toFixed(3)}°`
 })
-const sourceLabel = computed(() => ({ default: 'BEIJING / DEFAULT', gps: 'CURRENT POSITION', manual: 'MANUAL POSITION' })[store.location.source])
+const sourceLabel = computed(() => ({ default: '北京 / 默认', gps: '实时定位', manual: '手动位置' })[store.location.source])
 const calendarToday = computed(() => dayInfo())
 const dailyFortune = computed(() => fortune())
 
@@ -738,7 +738,7 @@ onBeforeUnmount(() => {
       <div class="hero-grain" aria-hidden="true"></div>
       <div class="hero-content">
         <div class="hero-copy">
-          <p class="hero-kicker"><span></span>浑仪 / CELESTIAL INSTRUMENT</p>
+          <p class="hero-kicker"><span></span>浑仪 / 观象仪器</p>
           <h1 id="cosmic-title" class="hero-title">
             <span class="hero-line"><span class="line-inner">观天象</span></span>
             <span class="hero-line hero-line-indent"><span class="line-inner">定此刻</span></span>
@@ -747,11 +747,11 @@ onBeforeUnmount(() => {
           <p class="hero-capabilities">黄历 · 八字 · 六爻 · 解梦 · 观星 · 二十八宿</p>
           <div class="hero-actions">
             <button class="hero-cta" type="button" @click="scrollToProfile">校准时空<span aria-hidden="true">↘</span></button>
-            <span class="hero-action-note">SCROLL TO CALIBRATE</span>
+            <span class="hero-action-note">向下校准</span>
           </div>
           <div class="hero-today" aria-label="今日历法摘要">
             <div class="hero-today-core">
-              <span class="hero-today-kicker">TODAY / 今日</span>
+              <span class="hero-today-kicker">今日 / 此刻</span>
               <div class="hero-today-date">
                 <strong>{{ calendarToday.dateStr }}</strong>
                 <span>{{ calendarToday.lunarText }}</span>
@@ -770,14 +770,14 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="hero-telemetry" aria-label="罗盘实时数据">
-          <div><span>LOCAL TIME</span><strong>{{ localTime }}</strong></div>
-          <div><span>SOLAR AZIMUTH</span><strong>{{ position.azimuth.toFixed(1) }}°</strong></div>
-          <div><span>POSITION</span><strong>{{ coordinateText }}</strong><small>{{ sourceLabel }}</small></div>
+          <div><span>当地时间</span><strong>{{ localTime }}</strong></div>
+          <div><span>太阳方位</span><strong>{{ position.azimuth.toFixed(1) }}°</strong></div>
+          <div><span>观测位置</span><strong>{{ coordinateText }}</strong><small>{{ sourceLabel }}</small></div>
         </div>
       </div>
-      <span class="hero-edition">TIANJI / 2026</span>
+      <span class="hero-edition">天机 / 2026</span>
       <button class="scroll-cue" type="button" aria-label="滚动到今日内容" @click="scrollToProfile"><span>向下探索</span><i></i></button>
-      <p v-if="webglFailed" class="webgl-fallback">当前设备未启用 WebGL，已切换为静态星图。</p>
+      <p v-if="webglFailed" class="webgl-fallback">当前设备未启用图形加速，已切换为静态星图。</p>
     </div>
   </section>
 </template>
