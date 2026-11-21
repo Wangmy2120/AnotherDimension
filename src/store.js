@@ -45,6 +45,7 @@ export const store = reactive({
   aiContextKind: 'daily',
   hexSession: loadHexSession(),
   dreamSession: loadDreamSession(),
+  skySession: null,
   tabRequest: null
 })
 

@@ -1,5 +1,5 @@
 <script setup>
-import { computed, defineAsyncComponent } from 'vue'
+import { computed, defineAsyncComponent, ref } from 'vue'
 import { bazi, dayInfo, fortune, store } from '../store.js'
 import { getDayInfo } from '../lib/calendar.js'
 import HomeProfile from '../components/HomeProfile.vue'
@@ -27,6 +27,18 @@ const info = computed(() => dayInfo())
 const ft = computed(() => fortune())
 const chart = computed(() => bazi())
 
+// 天文推算只在首页后台加载，避免把 sky.js 打进入口块。
+const skyModule = ref(null)
+import('../lib/sky.js').then(module => {
+  skyModule.value = module
+})
+const sky = computed(() => {
+  const module = skyModule.value
+  if (!module) return null
+  const moment = module.getSkyMoment(new Date(), store.location.latitude, store.location.longitude)
+  return { moment, clock: module.formatClock(moment.date) }
+})
+
 const modules = computed(() => {
   const day = info.value
   const fortuneData = ft.value
@@ -40,6 +52,12 @@ const modules = computed(() => {
   }))
   const xiuName = day.xiuName.replace(/宿$/, '')
   const zejiDays = futureDays(day.dateStr, 30)
+  const skySnapshot = sky.value
+  const skyMoment = skySnapshot?.moment ?? null
+  const skyTargets = skyMoment
+    ? skyMoment.visible.filter(body => body.key !== 'moon')
+      .sort((a, b) => a.magnitude - b.magnitude).slice(0, 12)
+    : []
   return [
     {
       key: 'almanac',
@@ -141,6 +159,32 @@ const modules = computed(() => {
         : [{ label: '梦境状态', value: '尚未记录' }],
       instrument: { keyword: dream?.keyword || '梦' },
       cta: '进入解梦'
+    },
+    {
+      key: 'sky',
+      label: meta('sky').label,
+      path: meta('sky').path,
+      chapter: `${meta('sky').number} / ${meta('sky').code}`,
+      title: meta('sky').title,
+      concept: '仰见星辰。以所在坐标推算此刻的天光、月相与星位，知道何时抬头、该朝哪个方向看。',
+      description: skyMoment
+        ? `${skySnapshot.clock} · ${skyMoment.score.darknessLabel} · ${skyMoment.moon.phaseName}`
+        : '按所在坐标推算今夜星位，须等到天黑才好看。',
+      metrics: skyMoment
+        ? [
+            { label: '暗夜指数', value: `${skyMoment.score.total} · ${skyMoment.score.label}` },
+            { label: '可见', value: `${skyMoment.visible.filter(body => body.kind === 'planet').length} 行星 · ${skyMoment.visible.filter(body => body.kind === 'star').length} 亮星` },
+            { label: '月相', value: `${Math.round(skyMoment.moon.illumination * 100)}% ${skyMoment.moon.waxing ? '盈' : '亏'}` }
+          ]
+        : [{ label: '星图状态', value: '推算中' }],
+      instrument: {
+        score: skyMoment?.score.total ?? null,
+        moonName: skyMoment?.moon.phaseName || '月',
+        illumination: skyMoment?.moon.illumination ?? 0,
+        waxing: skyMoment?.moon.waxing ?? true,
+        targets: skyTargets
+      },
+      cta: '进入观星'
     }
   ]
 })
@@ -161,7 +205,7 @@ function continueJourney() {
     <CosmicHero />
     <HomeProfile @continue="continueJourney" />
     <SpiralJourney id="journey" :items="modules" @open="openModule" />
-    <section class="home-breath" aria-label="星轨留白"><p>六轨既明，静候一心。</p></section>
+    <section class="home-breath" aria-label="星轨留白"><p>七轨既明，静候一心。</p></section>
   </div>
 </template>
 

@@ -62,6 +62,14 @@ const sourceItems = computed(() => {
       source: '民俗象征与《周公解梦》通俗传统'
     })
   }
+  if (store.aiContextKind === 'sky' && store.skySession) {
+    const sky = store.skySession
+    items.push({
+      label: '星象',
+      text: `${sky.dateStr} ${sky.clock} · ${sky.score.darkness} · ${sky.moon.phase}（照明 ${sky.moon.illumination}%）· 可见行星 ${sky.planets.filter(item => item.高度 > 0).map(item => item.名称).join('、') || '无'}`,
+      source: '数据由本机近似天文算法推算，仅随星象与所在城市级坐标发送，不含生辰资料'
+    })
+  }
   return items
 })
 
@@ -79,11 +87,13 @@ watch(() => store.aiOpen, async open => {
   error.value = ''
   await nextTick()
   closeButton.value?.focus()
-  const ctx = {
-    dayInfo: dayInfo(),
-    bazi: bazi(),
-    fortune: fortune()
-  }
+  const ctx = store.aiContextKind === 'sky' && store.skySession
+    ? { dayInfo: dayInfo(), sky: store.skySession }
+    : {
+        dayInfo: dayInfo(),
+        bazi: bazi(),
+        fortune: fortune()
+      }
   if (store.aiContextKind === 'hexagram' && store.hexSession) {
     ctx.hexResult = store.hexSession.result
     ctx.question = store.hexSession.question
@@ -140,7 +150,7 @@ onBeforeUnmount(() => {
   <div v-if="store.aiOpen" class="modal-mask" @click.self="close">
     <div ref="dialog" class="modal" role="dialog" aria-modal="true" aria-labelledby="ai-dialog-title">
       <div class="modal-head">
-        <h3 id="ai-dialog-title">{{ { hexagram: '卦象解读', dream: '梦境解读' }[store.aiContextKind] || '今日解读' }}</h3>
+        <h3 id="ai-dialog-title">{{ { hexagram: '卦象解读', dream: '梦境解读', sky: '观星解读' }[store.aiContextKind] || '今日解读' }}</h3>
         <button ref="closeButton" class="modal-close" type="button" aria-label="关闭解读" @click="close">✕</button>
       </div>
       <div class="modal-body">

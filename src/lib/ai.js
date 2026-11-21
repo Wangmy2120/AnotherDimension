@@ -1,6 +1,6 @@
 export const AI_ENDPOINT = '/functions/v1/app/interpret'
 
-export function buildContext({ dayInfo, bazi, fortune, solar, hexResult, question, dream }) {
+export function buildContext({ dayInfo, bazi, fortune, solar, hexResult, question, dream, sky }) {
   const ctx = {
     日期: `${dayInfo.dateStr}（农历${dayInfo.lunarText}）`,
     干支: `${dayInfo.yearGanZhi}年 ${dayInfo.monthGanZhi}月 ${dayInfo.dayGanZhi}日`,
@@ -47,9 +47,23 @@ export function buildContext({ dayInfo, bazi, fortune, solar, hexResult, questio
   if (dream) {
     ctx.梦境 = { 关键词: dream.keyword, 民俗释义: dream.text, 传统吉凶: dream.luck }
   }
+  if (sky) {
+    ctx.今夜星空 = {
+      时刻: `${sky.dateStr} ${sky.clock}`,
+      地点: `${sky.location.latitude.toFixed(3)}, ${sky.location.longitude.toFixed(3)}（${{ default: '默认位置', gps: '浏览器定位', manual: '手动输入' }[sky.location.source] || '默认位置'}）`,
+      暗夜指数: `${sky.score.total}/100 ${sky.score.label}（${sky.score.darkness}）`,
+      太阳: `高度 ${sky.sun.elevation}°`,
+      月相: `${sky.moon.phase}，照明 ${sky.moon.illumination}%，${sky.moon.hint}`,
+      行星: sky.planets,
+      已升起亮星: sky.stars,
+      今夜事件: sky.events
+    }
+  }
   const ask = dream
     ? '以下是用户梦境的民俗释义与今日背景数据，请结合传统解梦文化与现代心理视角，温和积极地为用户解读此梦，并给出安心的生活建议：'
-    : '以下是工具今日生成的数据，请综合解读：'
+    : sky
+      ? '以下是用户此刻所在地点实测推算的星空数据，请结合中国传统星宿文化与天文常识，解读今夜星空可观什么、何时看、朝哪个方位看，语气温克制，不作吉凶断言：'
+      : '以下是工具今日生成的数据，请综合解读：'
   return `${ask}\n${JSON.stringify(ctx, null, 1)}`
 }
 

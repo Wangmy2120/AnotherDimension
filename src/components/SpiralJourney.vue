@@ -967,7 +967,7 @@ onBeforeUnmount(() => {
       <div class="journey-intro">
         <div class="intro-inner">
           <p>星轨 / CELESTIAL INDEX · {{ String(items.length).padStart(2, '0') }}</p>
-          <h2 id="journey-title">六章命轨，<br>皆为你所行。</h2>
+          <h2 id="journey-title">七章命轨，<br>皆为你所行。</h2>
           <span>向下滚动，沿银墨螺旋逐章靠近。当前章节停驻于中心，点选卡片即可抵达。</span>
           <i aria-hidden="true"></i>
         </div>
@@ -1003,7 +1003,7 @@ onBeforeUnmount(() => {
           </div>
           <div class="stage-vignette" aria-hidden="true"></div>
 
-          <nav class="chapter-deck" aria-label="六项星轨功能">
+          <nav class="chapter-deck" aria-label="七项星轨功能">
             <a
               v-for="(item, index) in items"
               :key="item.key"
@@ -1075,7 +1075,7 @@ onBeforeUnmount(() => {
     <div v-else class="static-journey">
       <header class="static-heading">
         <p>星轨 / CELESTIAL INDEX · {{ String(items.length).padStart(2, '0') }}</p>
-        <h2 id="journey-title">六章星轨</h2>
+        <h2 id="journey-title">七章星轨</h2>
         <span>{{ webglFailed ? 'WebGL 暂不可用，星图已静态展开。' : '已依减少动态效果偏好静态展开。' }}</span>
       </header>
       <div class="static-grid">

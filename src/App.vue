@@ -21,6 +21,8 @@ const loaders = {
   bazi: () => import('./views/BaziView.vue'),
   gua: () => import('./views/DivinationView.vue'),
   dream: () => import('./views/DreamView.vue'),
+  sky: () => import('./views/SkyView.vue'),
+  kindred: () => import('./views/KindredView.vue'),
   synthesis: () => Promise.resolve({ default: SynthesisView }),
   settings: () => import('./views/SettingsView.vue')
 }
@@ -58,6 +60,8 @@ const chapterMeta = computed(() => ({
   bazi: chart.value ? `${chart.value.dayGan}日主 · ${chart.value.shengXiao}` : '等待录入生辰',
   gua: store.hexSession?.result?.primaryName || '尚未起卦',
   dream: store.dreamSession?.keyword || '尚未记录',
+  sky: `${info.value.xiuName}值宿 · 今夜观星`,
+  kindred: `${info.value.dayGanZhi}日 · ${info.value.xiuName}`,
   synthesis: '历法 · 命盘 · 卦象 · 梦境',
   settings: '隐私 · 数据 · 声音'
 }))
@@ -117,6 +121,18 @@ const activeFacts = computed(() => {
             { label: '梦境', value: '尚未记录' },
             { label: '记录', value: '仅保存在此浏览器' }
           ]
+    case 'sky':
+      return [
+        { label: '日期', value: info.value.dateStr },
+        { label: '值宿', value: `${info.value.xiu} · ${info.value.xiuLuck}` },
+        { label: '观测点', value: { default: '默认 · 北京', gps: '浏览器定位', manual: '手动坐标' }[store.location.source] }
+      ]
+    case 'kindred':
+      return [
+        { label: '日期', value: info.value.dateStr },
+        { label: '日柱', value: info.value.dayGanZhi },
+        { label: '值宿', value: info.value.xiu }
+      ]
     case 'synthesis':
       return [
         { label: '日期', value: info.value.dateStr },
@@ -315,6 +331,43 @@ function handleIndexKeys(event) {
   }
 }
 
+// 章节是扁平的：今日为上一层，左右键在同级之间移动。
+function isTyping() {
+  const element = document.activeElement
+  return !element || ['INPUT', 'TEXTAREA', 'SELECT'].includes(element.tagName) || element.isContentEditable
+}
+
+function siblingChapter(offset) {
+  const index = chapters.findIndex(chapter => chapter.key === active.value)
+  if (index < 0) return null
+  return chapters[index + offset] || null
+}
+
+function handleShortcuts(event) {
+  if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || store.aiOpen || isTyping()) return
+  if (event.key === 'Backspace') {
+    event.preventDefault()
+    if (active.value !== 'home') navigateTo('home')
+    return
+  }
+  if (indexOpen.value) return
+  if (event.key === 'Escape') {
+    if (active.value !== 'home') navigateTo('home')
+    return
+  }
+  if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+    const target = siblingChapter(event.key === 'ArrowRight' ? 1 : -1)
+    if (!target) return
+    event.preventDefault()
+    navigateTo(target.key)
+    return
+  }
+  if (event.key.toLowerCase() === 'i' && !event.shiftKey) {
+    event.preventDefault()
+    openIndex()
+  }
+}
+
 function setupLenis() {
   if (lenis || reducedMotion() || window.matchMedia('(pointer: coarse)').matches) return
   lenis = new Lenis({ autoRaf: false, lerp: 0.09, smoothWheel: true, syncTouch: false, anchors: false })
@@ -408,6 +461,7 @@ onMounted(async () => {
   setupLenis()
   setupCardReveal()
   window.addEventListener('keydown', handleIndexKeys)
+  window.addEventListener('keydown', handleShortcuts)
   window.addEventListener('scroll', handleScrollState, { passive: true })
   window.addEventListener('pointermove', handleMagneticMove, { passive: true })
   window.addEventListener('pointerout', handleMagneticLeave, { passive: true })
@@ -431,6 +485,7 @@ onBeforeUnmount(() => {
   window.clearTimeout(prefetchTimer)
   window.clearTimeout(scrollStateTimer)
   window.removeEventListener('keydown', handleIndexKeys)
+  window.removeEventListener('keydown', handleShortcuts)
   window.removeEventListener('scroll', handleScrollState)
   window.removeEventListener('pointermove', handleMagneticMove)
   window.removeEventListener('pointerout', handleMagneticLeave)
@@ -521,7 +576,10 @@ onBeforeUnmount(() => {
               <span class="index-arrow" aria-hidden="true">↗</span>
             </a>
           </nav>
-          <footer class="index-foot">ESC 关闭 · 观时 · 知位 · 见天地</footer>
+          <footer class="index-foot">
+            <p class="index-keys"><kbd>←</kbd><kbd>→</kbd>换章 · <kbd>Backspace</kbd>回今日 · <kbd>I</kbd>索引 · <kbd>Esc</kbd>关闭</p>
+            <p>观时 · 知位 · 见天地</p>
+          </footer>
         </section>
       </div>
     </Transition>

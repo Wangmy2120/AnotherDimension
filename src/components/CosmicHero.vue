@@ -744,7 +744,7 @@ onBeforeUnmount(() => {
             <span class="hero-line hero-line-indent"><span class="line-inner">定此刻</span></span>
           </h1>
           <p class="hero-description">以时间为针，以天地为盘。<br>在星辰与方位之间，重新感知此刻。</p>
-          <p class="hero-capabilities">黄历 · 八字 · 六爻 · 解梦 · 二十八宿</p>
+          <p class="hero-capabilities">黄历 · 八字 · 六爻 · 解梦 · 观星 · 二十八宿</p>
           <div class="hero-actions">
             <button class="hero-cta" type="button" @click="scrollToProfile">校准时空<span aria-hidden="true">↘</span></button>
             <span class="hero-action-note">SCROLL TO CALIBRATE</span>

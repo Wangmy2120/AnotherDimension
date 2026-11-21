@@ -91,6 +91,35 @@ const dreamStars = computed(() => {
   }))
 })
 const dreamKeyword = computed(() => String(props.data?.keyword || '梦').slice(0, 4))
+
+const skyDots = computed(() => {
+  const targets = Array.isArray(props.data?.targets) ? props.data.targets : []
+  return targets.map((target, index) => {
+    const distance = (90 - Math.max(0, Math.min(90, Number(target.elevation) || 0))) / 90 * 50
+    const angle = (Number(target.azimuth) || 0) * Math.PI / 180
+    return {
+      index,
+      planet: target.kind === 'planet',
+      x: 70 + Math.sin(angle) * distance,
+      y: 82 - Math.cos(angle) * distance
+    }
+  })
+})
+
+/** 亮缘画半圈，再用长短轴随照明度收放的弧补出明暗界线；两弧同起终点即成月相轮廓。 */
+const skyMoon = computed(() => {
+  const illumination = Math.max(0.02, Math.min(0.98, Number(props.data?.illumination) || 0))
+  const radius = 15
+  const limb = props.data?.waxing === false ? 0 : 1
+  const terminator = illumination > 0.5 ? 1 - limb : limb
+  const from = `172 ${76 - radius}`
+  const to = `172 ${76 + radius}`
+  return {
+    percent: Math.round(illumination * 100),
+    limbPath: `M ${from} A ${radius} ${radius} 0 0 ${limb} ${to}`,
+    terminatorPath: `M ${from} A ${(Math.abs(1 - 2 * illumination) * radius).toFixed(2)} ${radius} 0 0 ${terminator} ${to}`
+  }
+})
 </script>
 
 <template>
@@ -174,6 +203,26 @@ const dreamKeyword = computed(() => String(props.data?.keyword || '梦').slice(0
       <circle cx="119" cy="82" r="29" class="orbit faint" />
       <text x="119" y="86" text-anchor="middle" class="keyword">{{ dreamKeyword }}</text>
     </svg>
+
+    <svg v-else-if="type === 'sky'" viewBox="0 0 240 150" focusable="false">
+      <g class="instrument-caption"><text x="8" y="16">星盘 / SKY</text><text x="150" y="16">暗夜 {{ data.score ?? '—' }}</text></g>
+      <circle cx="70" cy="82" r="50" class="orbit" />
+      <circle cx="70" cy="82" r="33" class="orbit faint" />
+      <circle cx="70" cy="82" r="17" class="orbit faint" />
+      <path d="M70 32v100M20 82h100" class="hairline" />
+      <text x="70" y="25" text-anchor="middle" class="bearing">北</text>
+      <text x="70" y="148" text-anchor="middle" class="bearing">南</text>
+      <text x="10" y="86" text-anchor="middle" class="bearing">东</text>
+      <text x="130" y="86" text-anchor="middle" class="bearing">西</text>
+      <g v-for="dot in skyDots" :key="dot.index">
+        <circle :cx="dot.x" :cy="dot.y" :r="dot.planet ? 2.6 : 1.4" :class="dot.planet ? 'planet-dot' : 'star-dot'" />
+      </g>
+      <circle cx="172" cy="76" r="15" class="orbit faint" />
+      <path :d="skyMoon.limbPath" class="moon-limb" />
+      <path :d="skyMoon.terminatorPath" class="moon-terminator" />
+      <text x="172" y="108" text-anchor="middle" class="small-label">{{ data.moonName || '月' }}</text>
+      <text x="172" y="122" text-anchor="middle" class="small-label">{{ skyMoon.percent }}%</text>
+    </svg>
   </span>
 </template>
 
@@ -220,6 +269,11 @@ const dreamKeyword = computed(() => String(props.data?.keyword || '梦').slice(0
 .dream-star { fill: var(--glow); }
 .ink-thread { fill: none; stroke: oklch(0.97 0 0 / 0.22); stroke-width: 5; stroke-linecap: round; filter: blur(3px); }
 .keyword { fill: var(--silver); font-family: 'Noto Serif SC', 'Songti SC', serif; font-size: 12px; letter-spacing: 0.12em; }
+.bearing { fill: var(--muted); font-size: 10px; letter-spacing: 0.06em; }
+.star-dot { fill: oklch(0.97 0 0 / 0.52); }
+.planet-dot { fill: var(--glow); filter: drop-shadow(0 0 4px oklch(0.97 0 0 / 0.55)); }
+.moon-limb { fill: none; stroke: var(--glow); stroke-width: 1.1; }
+.moon-terminator { fill: none; stroke: oklch(0.97 0 0 / 0.5); stroke-width: 0.9; }
 .chapter-card.active .chapter-instrument,
 .static-card .chapter-instrument { top: 104px; right: 20px; bottom: auto; width: min(34%, 200px); opacity: 0.58; }
 .chapter-card:not(.active):not(.static-card) .chapter-instrument { top: 78px; right: auto; bottom: auto; left: 50%; width: min(62%, 230px); opacity: 0.14; transform: translateX(-50%); }

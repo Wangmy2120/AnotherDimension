@@ -70,12 +70,32 @@ export const chapters = [
     intro: true
   },
   {
+    key: 'sky',
+    label: '观星',
+    code: 'CELESTIAL',
+    title: '仰见星辰',
+    path: '#/sky',
+    number: '07',
+    group: 'chapter',
+    intro: true
+  },
+  {
+    key: 'kindred',
+    label: '同象',
+    code: 'KINDRED',
+    title: '异世同象',
+    path: '#/kindred',
+    number: '08',
+    group: 'chapter',
+    intro: true
+  },
+  {
     key: 'synthesis',
     label: '合参',
     code: 'SYNTHESIS',
     title: '万轨归一',
     path: '#/synthesis',
-    number: '07',
+    number: '09',
     group: 'conclusion',
     intro: false
   },
@@ -103,7 +123,6 @@ export const futureChapters = [
 export const chapterByKey = Object.fromEntries(chapters.map(chapter => [chapter.key, chapter]))
 export const futureChapterByKey = Object.fromEntries(futureChapters.map(chapter => [chapter.key, chapter]))
 export const readingChapters = chapters.filter(chapter => chapter.group === 'chapter' || chapter.group === 'conclusion')
-export const sixChapters = chapters.filter(chapter => chapter.group === 'chapter')
 
 export function chapterFromHash(hash) {
   const normalized = !hash || hash === '#' ? '#/' : hash
