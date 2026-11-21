@@ -20,8 +20,12 @@ export function buildContext({ dayInfo, bazi, fortune, solar, hexResult, questio
       四柱: bazi.pillars.map(p => `${p.label}${p.gz}`).join(' '),
       日主: `${bazi.dayGan}（${bazi.dayMasterWuXing}）`,
       生肖: bazi.shengXiao,
+      性别: { male: '男', female: '女' }[bazi.gender] || '未提供',
       五行分布: bazi.wxCount,
-      纳音: bazi.pillars.map(p => p.ny).join('、')
+      纳音: bazi.pillars.map(p => p.ny).join('、'),
+      当前大运: bazi.yun
+        ? `${bazi.yun.currentGanZhi}（${bazi.yun.start}）`
+        : '未提供'
     }
   }
   if (fortune) {

@@ -129,6 +129,7 @@ export function getBazi(profile) {
     dayGan,
     dayMasterWuXing: LunarUtil.WU_XING_GAN[dayGan],
     shengXiao: zodiacFromGanZhi(ec.getYear()),
+    gender: profile.gender || '',
     taiYuan: ec.getTaiYuan(),
     mingGong: ec.getMingGong(),
     shenGong: ec.getShenGong(),

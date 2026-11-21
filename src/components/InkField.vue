@@ -53,7 +53,7 @@ function mobile() {
 }
 
 function makeStars() {
-  const count = reducedMotion ? 0 : props.home ? (mobile() ? 90 : 200) : (mobile() ? 30 : 40)
+  const count = reducedMotion ? 0 : props.home ? (mobile() ? 120 : 260) : (mobile() ? 45 : 72)
   stars = Array.from({ length: count }, (_, index) => {
     const layer = index % 3
     return {
@@ -62,8 +62,8 @@ function makeStars() {
       originX: random() * width,
       originY: random() * height,
       layer,
-      size: 0.5 + layer * 0.5 + random() * 0.45,
-      alpha: 0.1 + layer * 0.07 + random() * 0.08,
+      size: 0.65 + layer * 0.55 + random() * 0.5,
+      alpha: 0.14 + layer * 0.09 + random() * 0.1,
       drift: 0.0003 + random() * 0.0007,
       phase: random() * Math.PI * 2
     }
@@ -104,7 +104,7 @@ function drawStatic() {
 function addDrop(x, y, speed = 0, options = {}) {
   const limit = mobile() ? 40 : 80
   if (drops.length >= limit) drops.splice(0, drops.length - limit + 1)
-  const maxR = options.maxR || Math.min(46, 18 + speed * 13)
+  const maxR = options.maxR || Math.min(76, 30 + speed * 20)
   drops.push({
     x,
     y,
@@ -113,9 +113,9 @@ function addDrop(x, y, speed = 0, options = {}) {
     vx: (random() - 0.5) * 0.018,
     vy: (random() - 0.5) * 0.014 - 0.004,
     age: 0,
-    life: options.life || 900 + random() * 650,
+    life: options.life || 1000 + random() * 650,
     maxR,
-    alpha: options.alpha || Math.min(0.16, 0.085 + speed * 0.025),
+    alpha: options.alpha || Math.min(0.46, 0.3 + speed * 0.075),
     phase: random() * Math.PI * 2,
     drift: 2 + random() * 6,
     spriteIndex: Math.floor(random() * Math.max(1, sprites.length))
@@ -123,15 +123,15 @@ function addDrop(x, y, speed = 0, options = {}) {
 }
 
 function addPulse(x, y, silent = false) {
-  addDrop(x, y, 0, { maxR: 70, alpha: 0.16, life: 1250 })
+  addDrop(x, y, 0, { maxR: 110, alpha: 0.46, life: 1500 })
   if (rings.length >= 10) rings.shift()
-  rings.push({ x, y, age: 0, life: 720, maxR: 92 })
+  rings.push({ x, y, age: 0, life: 820, maxR: 132 })
   if (!silent) sound.drop()
 }
 
 function addTrailPoint(x, y, speed) {
   trail.push({ x, y, speed, time: performance.now() })
-  if (trail.length > 14) trail.shift()
+  if (trail.length > 22) trail.shift()
 }
 
 function handlePointerMove(event) {
@@ -162,14 +162,14 @@ function updatePointer(x, y) {
     }
     addTrailPoint(x, y, speed)
     if (speed > 1.25) {
-      const satellites = 2 + Math.floor(random() * 3)
+      const satellites = 3 + Math.floor(random() * 3)
       for (let index = 0; index < satellites; index += 1) {
         const angle = random() * Math.PI * 2
-        const distanceFromStroke = 8 + random() * 20
+        const distanceFromStroke = 8 + random() * 24
         addDrop(x + Math.cos(angle) * distanceFromStroke, y + Math.sin(angle) * distanceFromStroke, speed * 0.4, {
-          maxR: 8 + random() * 12,
-          alpha: 0.1,
-          life: 550 + random() * 350
+          maxR: 14 + random() * 22,
+          alpha: 0.26,
+          life: 700 + random() * 380
         })
       }
     }
@@ -225,8 +225,8 @@ function drawTrail(now) {
     context.beginPath()
     context.moveTo(previous.x, previous.y)
     context.lineTo(point.x, point.y)
-    context.lineWidth = Math.min(8, 1.2 + point.speed * 2.2) * (index / trail.length)
-    context.strokeStyle = `rgba(236,238,236,${Math.min(0.06, 0.018 + point.speed * 0.012) * fade})`
+    context.lineWidth = Math.min(14, 2 + point.speed * 3.6) * (index / trail.length)
+    context.strokeStyle = `rgba(236,238,236,${Math.min(0.22, 0.06 + point.speed * 0.035) * fade})`
     context.stroke()
   }
   context.restore()
@@ -246,7 +246,7 @@ function drawDrops(delta, now) {
     const seconds = delta / 16.67
     drop.x += drop.vx * delta + Math.sin(now * 0.0012 + drop.phase) * drop.drift * 0.003 * seconds
     drop.y += drop.vy * delta + Math.cos(now * 0.001 + drop.phase) * drop.drift * 0.002 * seconds
-    const fade = progress < 0.18 ? progress / 0.18 : Math.pow(1 - progress, 1.35)
+    const fade = progress < 0.1 ? progress / 0.1 : Math.pow(1 - progress, 1.1)
     context.globalAlpha = Math.max(0, drop.alpha * fade)
     const brush = sprites[drop.spriteIndex % sprites.length] || sprites[0]
     if (!brush) continue
@@ -270,8 +270,8 @@ function drawRings(delta) {
     const progress = ring.age / ring.life
     context.beginPath()
     context.arc(ring.x, ring.y, 8 + ring.maxR * (1 - Math.pow(1 - progress, 3)), 0, Math.PI * 2)
-    context.strokeStyle = `rgba(238,240,238,${0.12 * (1 - progress)})`
-    context.lineWidth = 0.8
+    context.strokeStyle = `rgba(238,240,238,${0.28 * (1 - progress)})`
+    context.lineWidth = 1.1
     context.stroke()
   }
 }
@@ -339,7 +339,7 @@ function updateCursor(event) {
   const interactive = target?.closest('button, a, [role="button"]')
   const heroCanvas = target?.closest('.cosmic-stage canvas, .hero-canvas')
   cursorVisible.value = !systemInput
-  cursorLabel.value = heroCanvas ? '拖拽' : interactive ? '开启' : ''
+  cursorLabel.value = heroCanvas ? '拖拽' : interactive ? (target?.closest('a, [role="button"]') ? '开启' : '点按') : ''
   cursorRing.value?.classList.toggle('is-active', Boolean(heroCanvas || interactive))
   cursorDot.value.style.transform = `translate3d(${event.clientX}px,${event.clientY}px,0)`
   ringX?.(event.clientX)
@@ -429,22 +429,21 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="ink-field" :class="{ 'is-reduced': reducedMotion }" aria-hidden="true">
-    <canvas ref="canvas" class="ink-canvas"></canvas>
-    <div ref="cursorDot" class="cursor-dot" :class="{ visible: cursorVisible }"></div>
-    <div ref="cursorRing" class="cursor-ring" :class="{ visible: cursorVisible }">
+  <Teleport to="body">
+    <canvas ref="canvas" class="ink-canvas" aria-hidden="true"></canvas>
+    <div ref="cursorDot" class="cursor-dot" :class="{ visible: cursorVisible }" aria-hidden="true"></div>
+    <div ref="cursorRing" class="cursor-ring" :class="{ visible: cursorVisible }" aria-hidden="true">
       <span>{{ cursorLabel }}</span>
     </div>
-  </div>
+  </Teleport>
 </template>
 
 <style scoped>
-.ink-field { position: fixed; inset: 0; z-index: 35; pointer-events: none; }
-.ink-canvas { position: absolute; inset: 0; display: block; pointer-events: none; mix-blend-mode: screen; }
+.ink-canvas { position: fixed; inset: 0; z-index: 35; display: block; pointer-events: none; mix-blend-mode: screen; }
 .cursor-dot,
 .cursor-ring { position: fixed; top: 0; left: 0; pointer-events: none; opacity: 0; transition: opacity 160ms ease; }
-.cursor-dot { z-index: 302; width: 4px; height: 4px; margin: -2px 0 0 -2px; border-radius: 50%; background: var(--glow); box-shadow: 0 0 8px oklch(0.97 0 0 / 0.25); }
-.cursor-ring { z-index: 301; display: grid; width: 38px; height: 38px; margin: -19px 0 0 -19px; place-items: center; border: 1px solid oklch(0.97 0 0 / 0.38); border-radius: 50%; transition: width 180ms ease, height 180ms ease, margin 180ms ease, opacity 160ms ease, background-color 180ms ease; }
+.cursor-dot { z-index: 302; width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px; border-radius: 50%; background: var(--glow); box-shadow: 0 0 10px oklch(0.97 0 0 / 0.35); }
+.cursor-ring { z-index: 301; display: grid; width: 40px; height: 40px; margin: -20px 0 0 -20px; place-items: center; border: 1px solid oklch(0.97 0 0 / 0.52); border-radius: 50%; background: oklch(0.05 0 0 / 0.18); transition: width 180ms ease, height 180ms ease, margin 180ms ease, opacity 160ms ease, background-color 180ms ease; }
 .cursor-ring.is-active { width: 58px; height: 58px; margin: -29px 0 0 -29px; background: oklch(0.05 0 0 / 0.3); border-color: oklch(0.97 0 0 / 0.7); }
 .cursor-ring span { color: var(--glow); font-size: 10px; letter-spacing: 0.08em; }
 .cursor-dot.visible,

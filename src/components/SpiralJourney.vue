@@ -183,7 +183,7 @@ function goChapter(index) {
   const headerHeight = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--header-h')) || 0
   const top = track.value.getBoundingClientRect().top + window.scrollY - headerHeight
   const travel = Math.max(0, track.value.offsetHeight - (stage.value?.clientHeight || window.innerHeight))
-  const ratio = index === ITEM_COUNT - 1 ? 1 : (index + 0.18) / (ITEM_COUNT - 1)
+  const ratio = index === ITEM_COUNT - 1 ? 1 : (index + 0.08) / (ITEM_COUNT - 1)
   window.scrollTo({ top: top + travel * ratio, behavior: reducedMotion.value ? 'auto' : 'smooth' })
 }
 
@@ -451,7 +451,7 @@ function layoutChapters() {
   const raw = progress.value * (ITEM_COUNT - 1)
   const base = Math.floor(raw)
   const local = raw - base
-  const transition = easeInOut(clamp((local - 0.58) / 0.42))
+  const transition = easeInOut(clamp((local - 0.18) / 0.82))
   const position = Math.min(ITEM_COUNT - 1, base + transition)
   const mobile = isMobile.value
   const radius = mobile ? Math.min(width * 0.09, 42) : Math.min(width * 0.34, 500)
@@ -1127,7 +1127,7 @@ onBeforeUnmount(() => {
 .intro-inner h2 { margin-top: 24px; font-family: 'Noto Serif SC', 'Songti SC', serif; font-size: clamp(42px, 6vw, 88px); font-weight: 400; letter-spacing: 0.08em; line-height: 1.25; }
 .intro-inner > span { max-width: 38em; margin-top: 28px; color: var(--silver); font-size: 13px; line-height: 1.9; }
 .intro-inner i { width: 1px; height: 70px; margin-top: 38px; background: linear-gradient(var(--silver), transparent); }
-.journey-track { position: relative; height: 900vh; }
+.journey-track { position: relative; height: 400vh; }
 .journey-stage { position: sticky; top: var(--header-h); width: 100%; height: calc(100svh - var(--header-h)); min-height: min(620px, calc(100svh - var(--header-h))); overflow: hidden; }
 .scene-host { position: absolute; inset: 0; z-index: 0; }
 .scene-host :deep(canvas) { display: block; width: 100%; height: 100%; touch-action: pan-y; cursor: grab; }
@@ -1304,7 +1304,7 @@ onBeforeUnmount(() => {
   .journey-intro { height: 100vh; }
   .intro-inner { padding: 8vh 24px; }
   .intro-inner h2 { font-size: clamp(38px, 12vw, 54px); }
-  .journey-track { height: 720vh; }
+  .journey-track { height: 440vh; }
   .journey-stage { min-height: 0; }
   .chapter-card { left: 50%; width: calc(100vw - 36px); height: clamp(390px, 54svh, 470px); padding: 18px 16px; transform: translate(-50%, -50%); }
   .chapter-card-top { gap: 10px; font-size: 10px; letter-spacing: 0.12em; }

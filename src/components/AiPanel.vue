@@ -3,9 +3,37 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { store, dayInfo, bazi, fortune } from '../store.js'
 import { buildContext, streamInterpret } from '../lib/ai.js'
 
+const SECTION_TITLES = ['今天的状态', '适合去做', '先缓一缓', '给你的提醒', '它在提醒你']
+const SECTION_PATTERN = new RegExp(`^[\\s#*【\\[]*(${SECTION_TITLES.join('|')})[\\s】\\]*]*(?:[：:]\\s*([\\s\\S]*))?$`)
+
+function parseSections(value) {
+  const blocks = []
+  let current = null
+  for (const rawLine of value.split('\n')) {
+    const line = rawLine.trim()
+    if (!line) {
+      if (current) current.body.push('')
+      continue
+    }
+    const match = line.match(SECTION_PATTERN)
+    if (match) {
+      if (current) blocks.push(current)
+      current = { title: match[1], body: match[2] ? [match[2]] : [] }
+      continue
+    }
+    if (!current) current = { title: '', body: [] }
+    current.body.push(line)
+  }
+  if (current) blocks.push(current)
+  return blocks
+    .map(block => ({ title: block.title, body: block.body.join('\n').trim() }))
+    .filter(block => block.title || block.body)
+}
+
 const text = ref('')
 const loading = ref(false)
 const error = ref('')
+const blocks = computed(() => parseSections(text.value))
 const dialog = ref(null)
 const closeButton = ref(null)
 let controller = null
@@ -117,7 +145,15 @@ onBeforeUnmount(() => {
       </div>
       <div class="modal-body">
         <p v-if="error" class="muted" style="color: var(--cinnabar); line-height: 1.8">{{ error }}</p>
-        <div v-else class="ai-text" :class="{ 'ai-cursor': loading }">{{ text || '正在凝神推演……' }}</div>
+        <div v-else class="ai-text" :class="{ 'ai-cursor': loading }">
+          <template v-if="blocks.length">
+            <section v-for="(block, index) in blocks" :key="index" class="ai-block">
+              <h4 v-if="block.title">{{ block.title }}</h4>
+              <p v-if="block.body">{{ block.body }}</p>
+            </section>
+          </template>
+          <template v-else>正在凝神推演……</template>
+        </div>
         <details v-if="sourceItems.length" class="modal-sources">
           <summary>原文依据</summary>
           <ul>
@@ -131,6 +167,9 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.ai-block + .ai-block { margin-top: 18px; }
+.ai-block h4 { margin-bottom: 7px; color: var(--glow); font-family: 'Noto Serif SC', 'Songti SC', 'STSong', serif; font-size: 14px; font-weight: 400; letter-spacing: 0.16em; }
+.ai-block p { color: var(--silver); white-space: pre-wrap; }
 .modal-sources { margin-top: 24px; border-top: 1px solid var(--line); }
 .modal-sources summary { display: flex; min-height: 44px; align-items: center; color: var(--silver); cursor: pointer; font-size: 12px; letter-spacing: 0.1em; }
 .modal-sources summary::before { margin-right: 8px; color: var(--muted); content: '+'; }

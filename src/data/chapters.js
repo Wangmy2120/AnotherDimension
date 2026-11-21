@@ -91,7 +91,17 @@ export const chapters = [
   }
 ]
 
+// Future modules stay out of navigation until a view and loader are registered here.
+export const futureChapters = [
+  { key: 'folk-knowledge', label: '民俗', code: 'FOLKLORE', title: '知其所以然', path: '#/folk', group: 'future', enabled: false },
+  { key: 'xiaoliuren', label: '小六壬', code: 'XIAOLIUREN', title: '按时起课', path: '#/xiaoliuren', group: 'future', enabled: false },
+  { key: 'ziwei', label: '紫微斗数', code: 'ZIWEI', title: '观命于星', path: '#/ziwei', group: 'future', enabled: false },
+  { key: 'xiu', label: '星宿', code: 'MANSIONS', title: '循天列宿', path: '#/mansions', group: 'future', enabled: false },
+  { key: 'cezi', label: '测字', code: 'GLYPH', title: '一字见心', path: '#/cezi', group: 'future', enabled: false }
+]
+
 export const chapterByKey = Object.fromEntries(chapters.map(chapter => [chapter.key, chapter]))
+export const futureChapterByKey = Object.fromEntries(futureChapters.map(chapter => [chapter.key, chapter]))
 export const readingChapters = chapters.filter(chapter => chapter.group === 'chapter' || chapter.group === 'conclusion')
 export const sixChapters = chapters.filter(chapter => chapter.group === 'chapter')
 
